@@ -13,19 +13,20 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 import { BottomModal } from '../../components/common/BottomModal';
 import { Toast } from '../../components/common/Toast';
+import { fetchTransactions } from '../../lib/api';
 
 type RootStackParamList = {
   MainTabs: undefined;
   Home: undefined;
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type FilterType = 'all' | 'week' | 'month';
 
@@ -50,80 +51,24 @@ export default function EarningsPage() {
   const availableBalance = 487.50;
   const momoNumber = '0501234567';
 
-  const allTransactions: Transaction[] = [
-    {
-      id: '1',
-      type: 'earning',
-      amount: 25.00,
-      description: 'Trip to Osu Oxford Street',
-      date: '2024-01-15',
-      time: '09:30 AM',
-      status: 'completed'
-    },
-    {
-      id: '2',
-      type: 'earning',
-      amount: 32.50,
-      description: 'Trip to East Legon',
-      date: '2024-01-15',
-      time: '11:45 AM',
-      status: 'completed'
-    },
-    {
-      id: '3',
-      type: 'bonus',
-      amount: 15.00,
-      description: 'Peak hour bonus',
-      date: '2024-01-15',
-      time: '02:00 PM',
-      status: 'completed'
-    },
-    {
-      id: '4',
-      type: 'earning',
-      amount: 28.00,
-      description: 'Trip to Labone',
-      date: '2024-01-15',
-      time: '02:15 PM',
-      status: 'completed'
-    },
-    {
-      id: '5',
-      type: 'withdrawal',
-      amount: -200.00,
-      description: 'Withdrawal to MTN Mobile Money',
-      date: '2024-01-14',
-      time: '06:30 PM',
-      status: 'completed'
-    },
-    {
-      id: '6',
-      type: 'earning',
-      amount: 30.00,
-      description: 'Trip to Airport Residential',
-      date: '2024-01-14',
-      time: '10:20 AM',
-      status: 'completed'
-    },
-    {
-      id: '7',
-      type: 'bonus',
-      amount: 20.00,
-      description: 'Weekly performance bonus',
-      date: '2024-01-14',
-      time: '11:59 PM',
-      status: 'completed'
-    },
-    {
-      id: '8',
-      type: 'earning',
-      amount: 35.00,
-      description: 'Trip to Cantonments',
-      date: '2024-01-14',
-      time: '03:45 PM',
-      status: 'completed'
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  const loadTransactions = async () => {
+    try {
+      const data = await fetchTransactions();
+      // @ts-ignore - mismatch in type string literal
+      setAllTransactions(data);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const filterTransactions = () => {
     const today = new Date();
@@ -161,7 +106,7 @@ export default function EarningsPage() {
 
   const handleWithdraw = () => {
     const amount = parseFloat(withdrawAmount);
-    
+
     if (!withdrawAmount || withdrawAmount.trim() === '') {
       Alert.alert('Error', 'Please enter an amount');
       return;
@@ -210,22 +155,22 @@ export default function EarningsPage() {
       item.type === 'earning'
         ? 'arrow-down'
         : item.type === 'bonus'
-        ? 'gift'
-        : 'arrow-up';
-    
+          ? 'gift'
+          : 'arrow-up';
+
     const iconColor =
       item.type === 'earning'
         ? colors.primary
         : item.type === 'bonus'
-        ? colors.amber[600]
-        : colors.blue[600];
-    
+          ? colors.amber[600]
+          : colors.blue[600];
+
     const bgColor =
       item.type === 'earning'
         ? colors.primaryLight
         : item.type === 'bonus'
-        ? colors.amber[100]
-        : colors.blue[100];
+          ? colors.amber[100]
+          : colors.blue[100];
 
     return (
       <View style={styles.transactionItem}>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,17 @@ import ActiveTripPage from '../pages/active-trip';
 import TripCompletePage from '../pages/trip-complete';
 import SupportPage from '../pages/support';
 import NotFound from '../pages/NotFound';
+import AuthPage from '../pages/auth';
+import AuditLogsPage from '../pages/audit-logs';
+import { useAuth } from '../contexts/AuthContext';
+import SplashPage from '../pages/splash';
+import OnboardingPage from '../pages/onboarding';
+import PhoneLoginPage from '../pages/auth/PhoneLogin';
+import RegisterPage from '../pages/auth/RegisterPage';
+import PersonalInfoPage from '../pages/auth/PersonalInfoPage';
+import DriverLicensePage from '../pages/auth/DriverLicensePage';
+import DocumentsPage from '../pages/auth/DocumentsPage';
+import VehicleDetailsPage from '../pages/auth/VehicleDetailsPage';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -58,23 +69,23 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomePage}
         options={{ title: 'Home' }}
       />
-      <Tab.Screen 
-        name="Trips" 
+      <Tab.Screen
+        name="Trips"
         component={TripsPage}
         options={{ title: 'Trips' }}
       />
-      <Tab.Screen 
-        name="Earnings" 
+      <Tab.Screen
+        name="Earnings"
         component={EarningsPage}
         options={{ title: 'Earnings' }}
       />
-      <Tab.Screen 
-        name="Profile" 
+      <Tab.Screen
+        name="Profile"
         component={ProfilePage}
         options={{ title: 'Profile' }}
       />
@@ -83,6 +94,22 @@ function MainTabs() {
 }
 
 export function AppNavigator() {
+  const { session, loading } = useAuth();
+  const Stack = createNativeStackNavigator();
+
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading || !minTimeElapsed) {
+    return <SplashPage />;
+  }
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -90,12 +117,28 @@ export function AppNavigator() {
         animation: 'slide_from_right',
       }}
     >
-      <Stack.Screen name="MainTabs" component={MainTabs} />
-      <Stack.Screen name="Request" component={RequestPage} />
-      <Stack.Screen name="ActiveTrip" component={ActiveTripPage} />
-      <Stack.Screen name="TripComplete" component={TripCompletePage} />
-      <Stack.Screen name="Support" component={SupportPage} />
-      <Stack.Screen name="NotFound" component={NotFound} />
+      {!session ? (
+        <>
+          <Stack.Screen name="Onboarding" component={OnboardingPage} />
+          <Stack.Screen name="Auth" component={AuthPage} />
+          <Stack.Screen name="PhoneLogin" component={PhoneLoginPage} />
+          <Stack.Screen name="Register" component={RegisterPage} />
+          <Stack.Screen name="PersonalInfo" component={PersonalInfoPage} />
+          <Stack.Screen name="DriverLicense" component={DriverLicensePage} />
+          <Stack.Screen name="Documents" component={DocumentsPage} />
+          <Stack.Screen name="VehicleDetails" component={VehicleDetailsPage} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="Request" component={RequestPage} />
+          <Stack.Screen name="ActiveTrip" component={ActiveTripPage} />
+          <Stack.Screen name="TripComplete" component={TripCompletePage} />
+          <Stack.Screen name="Support" component={SupportPage} />
+          <Stack.Screen name="AuditLogs" component={AuditLogsPage} />
+          <Stack.Screen name="NotFound" component={NotFound} />
+        </>
+      )}
     </Stack.Navigator>
   );
 }

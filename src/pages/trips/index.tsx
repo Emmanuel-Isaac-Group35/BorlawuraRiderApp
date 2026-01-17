@@ -11,17 +11,18 @@ import {
   FlatList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
+import { fetchTrips } from '../../lib/api';
 
 type RootStackParamList = {
   MainTabs: undefined;
   Home: undefined;
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type FilterType = 'all' | 'today' | 'week' | 'month';
 
@@ -44,73 +45,29 @@ export default function TripsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
 
-  const allTrips: Trip[] = [
-    {
-      id: '1',
-      customerName: 'Kwame Mensah',
-      pickupLocation: 'Osu Oxford Street, Accra',
-      dropLocation: 'Kpone Landfill Site',
-      wasteType: 'General Waste',
-      fare: 25.00,
-      date: '2024-01-15',
-      time: '09:30 AM',
-      rating: 5,
-      status: 'completed'
-    },
-    {
-      id: '2',
-      customerName: 'Ama Serwaa',
-      pickupLocation: 'East Legon, Accra',
-      dropLocation: 'Tema Waste Transfer Station',
-      wasteType: 'Recyclables',
-      fare: 32.50,
-      date: '2024-01-15',
-      time: '11:45 AM',
-      rating: 5,
-      status: 'completed'
-    },
-    {
-      id: '3',
-      customerName: 'Kofi Asante',
-      pickupLocation: 'Labone, Accra',
-      dropLocation: 'Accra Compost Plant',
-      wasteType: 'Organic Waste',
-      fare: 28.00,
-      date: '2024-01-15',
-      time: '02:15 PM',
-      rating: 4,
-      status: 'completed'
-    },
-    {
-      id: '4',
-      customerName: 'Abena Osei',
-      pickupLocation: 'Airport Residential, Accra',
-      dropLocation: 'Kpone Landfill Site',
-      wasteType: 'General Waste',
-      fare: 30.00,
-      date: '2024-01-14',
-      time: '10:20 AM',
-      rating: 5,
-      status: 'completed'
-    },
-    {
-      id: '5',
-      customerName: 'Yaw Boateng',
-      pickupLocation: 'Cantonments, Accra',
-      dropLocation: 'Tema Waste Transfer Station',
-      wasteType: 'Mixed Waste',
-      fare: 35.00,
-      date: '2024-01-14',
-      time: '03:45 PM',
-      rating: 4,
-      status: 'completed'
-    },
-  ];
+  const [allTrips, setAllTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    loadTrips();
+  }, []);
+
+  const loadTrips = async () => {
+    try {
+      const data = await fetchTrips();
+      // @ts-ignore - mismatch in status string literal type vs generic string
+      setAllTrips(data);
+    } catch (error) {
+      console.error('Error fetching trips:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filterTrips = () => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    
+
     let filtered = allTrips;
 
     if (activeFilter === 'today') {
@@ -163,7 +120,7 @@ export default function TripsPage() {
 
   const renderTripItem = ({ item }: { item: Trip }) => {
     const isExpanded = expandedTrip === item.id;
-    
+
     return (
       <View style={styles.tripCard}>
         <TouchableOpacity
@@ -307,7 +264,7 @@ export default function TripsPage() {
         {filteredTrips.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="inbox-outline" size={48} color={colors.gray[400]} />
+              <Ionicons name="file-tray-outline" size={48} color={colors.gray[400]} />
             </View>
             <Text style={styles.emptyTitle}>No trips found</Text>
             <Text style={styles.emptyText}>

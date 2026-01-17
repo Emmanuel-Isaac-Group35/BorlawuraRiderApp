@@ -11,12 +11,16 @@ import {
   Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 import { Modal } from '../../components/common/Modal';
 import { Toast } from '../../components/common/Toast';
+import { useAuth } from '../../contexts/AuthContext';
+import { fetchStats, toggleOnlineStatus } from '../../lib/api';
+import { useEffect } from 'react';
+import { Alert } from 'react-native';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -27,38 +31,73 @@ type RootStackParamList = {
   Support: undefined;
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function HomePage() {
   const navigation = useNavigation<NavigationProp>();
+  const { profile, user } = useAuth();
+  const [stats, setStats] = useState({
+    todayEarnings: 0,
+    weeklyEarnings: 0,
+    todayTrips: 0,
+    rating: 5.0,
+  });
   const [isOnline, setIsOnline] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
 
-  const stats = {
-    todayEarnings: 87.50,
-    weeklyEarnings: 285.00,
-    todayTrips: 3,
-    rating: 4.9,
+  useEffect(() => {
+    if (user) {
+      loadStats();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (profile) {
+      setIsOnline(profile.is_online);
+      setStats(prev => ({ ...prev, rating: Number(profile.rating) }));
+    }
+  }, [profile]);
+
+  const loadStats = async () => {
+    if (!user) return;
+    try {
+      const data = await fetchStats(user.id);
+      setStats(prev => ({ ...prev, ...data }));
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
   };
 
   const handleToggleOnline = () => {
     if (!isOnline) {
       setShowConfirmModal(true);
     } else {
-      setIsOnline(false);
+      updateOnlineStatus(false);
+    }
+  };
+
+  const updateOnlineStatus = async (status: boolean) => {
+    if (!user) return;
+    try {
+      await toggleOnlineStatus(user.id, status);
+      setIsOnline(status);
+      if (status) {
+        setShowNotification(true);
+        setTimeout(() => {
+          setShowNotification(false);
+          navigation.navigate('Request');
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error updating online status:', error);
+      Alert.alert('Error', 'Failed to update status');
     }
   };
 
   const confirmGoOnline = () => {
-    setIsOnline(true);
     setShowConfirmModal(false);
-    setShowNotification(true);
-
-    setTimeout(() => {
-      setShowNotification(false);
-      navigation.navigate('Request');
-    }, 1500);
+    updateOnlineStatus(true);
   };
 
   return (

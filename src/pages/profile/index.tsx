@@ -13,7 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
@@ -24,12 +24,16 @@ type RootStackParamList = {
   MainTabs: undefined;
   Home: undefined;
   Support: undefined;
+  AuditLogs: undefined;
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfilePage() {
   const navigation = useNavigation<NavigationProp>();
+  const { signOut } = useAuth();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -94,7 +98,14 @@ export default function ProfilePage() {
         {
           text: 'Logout',
           style: 'destructive',
-          onPress: () => navigation.navigate('Home'),
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (error) {
+              console.error('Error logging out:', error);
+              Alert.alert('Error', 'Failed to logout');
+            }
+          },
         },
       ]
     );
@@ -171,7 +182,7 @@ export default function ProfilePage() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Verification Status</Text>
           {[
-            { label: "Driver's License", status: 'verified', icon: 'id-card-outline' },
+            { label: "Rider's License", status: 'verified', icon: 'id-card-outline' },
             { label: 'Tricycle Registration', status: 'verified', icon: 'car-outline' },
             { label: 'Insurance', status: 'verified', icon: 'shield-checkmark-outline' },
             { label: 'Background Check', status: 'verified', icon: 'search-outline' }
@@ -247,6 +258,21 @@ export default function ProfilePage() {
               thumbColor="#ffffff"
             />
           </View>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('AuditLogs')}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.gray[200] }]}>
+                <Ionicons name="document-text-outline" size={20} color={colors.text.secondary} />
+              </View>
+              <View>
+                <Text style={styles.settingLabel}>Audit Logs</Text>
+                <Text style={styles.settingDescription}>View account activity</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
+          </TouchableOpacity>
         </View>
 
         {/* Payment Details */}
