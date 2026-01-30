@@ -5,16 +5,18 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
-    SafeAreaView,
     Platform,
     KeyboardAvoidingView,
     ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function DriverLicensePage() {
     const navigation = useNavigation();
+    const { updateRegistrationData } = useAuth();
     const [licenseNumber, setLicenseNumber] = useState('');
 
     const handleBack = () => {
@@ -22,6 +24,13 @@ export default function DriverLicensePage() {
     };
 
     const handleNext = () => {
+        if (!licenseNumber) {
+            // Validation
+            return;
+        }
+        updateRegistrationData({
+            rider_license_number: licenseNumber
+        });
         navigation.navigate('Documents' as never);
     };
 

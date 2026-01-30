@@ -4,15 +4,21 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
     Platform,
     ScrollView,
+    Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '../../lib/supabase';
 
 export default function DocumentsPage() {
     const navigation = useNavigation();
+    const { updateRegistrationData } = useAuth();
+    // Local state for 'uploaded' UI feedback could be added here
 
     const handleBack = () => {
         navigation.goBack();
@@ -22,8 +28,60 @@ export default function DocumentsPage() {
         navigation.navigate('VehicleDetails' as never);
     };
 
-    const handleUpload = (documentType: string) => {
-        console.log(`Upload ${documentType}`);
+    const handleUpload = async (documentType: string) => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'], // Updated from deprecated MediaTypeOptions
+                allowsEditing: true,
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                const asset = result.assets[0];
+                const fileExt = asset.uri.split('.').pop();
+                const fileName = `${Date.now()}_${documentType}.${fileExt}`;
+                const filePath = `${fileName}`;
+
+                // Read the file as base64 (since React Native Expo filesystem access is limited for standard File objects in FormData on some versions, but Supabase supports base64 or ArrayBuffer)
+                // However, standard fetch with FormData works well in Expo modern versions.
+                // Let's use FormData which is the standard way.
+
+                const formData = new FormData();
+                formData.append('file', {
+                    uri: asset.uri,
+                    name: fileName,
+                    type: asset.mimeType || 'image/jpeg',
+                } as any);
+
+                const { data, error } = await supabase.storage
+                    .from('rider_documents')
+                    .upload(filePath, formData, {
+                        contentType: asset.mimeType || 'image/jpeg',
+                    });
+
+                if (error) {
+                    // Fallback for some Expo environments where direct FormData fails - try base64 (advanced) 
+                    // OR just alert for now. Usually standard form data works in Expo Go.
+                    throw error;
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('rider_documents')
+                    .getPublicUrl(filePath);
+
+                // Update context
+                let update: any = {};
+                if (documentType === 'profile_photo') update.avatar_url = publicUrl;
+                if (documentType === 'license_front') update.license_photo_url = publicUrl;
+                if (documentType === 'ghana_card') update.ghana_card_photo_url = publicUrl;
+
+                updateRegistrationData(update);
+                Alert.alert("Success", "Document uploaded successfully");
+            }
+        } catch (error: any) {
+            console.error(error);
+            Alert.alert("Upload Failed", error.message || "An error occurred while uploading");
+        }
     };
 
     return (

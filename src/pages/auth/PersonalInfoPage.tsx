@@ -5,19 +5,24 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
-    SafeAreaView,
     Platform,
     KeyboardAvoidingView,
     ScrollView,
     Modal,
+    Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function PersonalInfoPage() {
     const navigation = useNavigation();
-    const [firstName, setFirstName] = useState('Kofi');
-    const [lastName, setLastName] = useState('Mensah');
+    const { updateRegistrationData } = useAuth();
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [languages, setLanguages] = useState<string[]>(['English']);
     const [showLangModal, setShowLangModal] = useState(false);
 
@@ -37,6 +42,27 @@ export default function PersonalInfoPage() {
     };
 
     const handleNext = () => {
+        if (!firstName || !lastName || !password) {
+            Alert.alert("Missing Information", "Please fill in all required fields.");
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            Alert.alert("Password Mismatch", "Passwords do not match.");
+            return;
+        }
+
+        if (password.length < 6) {
+            Alert.alert("Weak Password", "Password must be at least 6 characters.");
+            return;
+        }
+
+        updateRegistrationData({
+            first_name: firstName,
+            last_name: lastName,
+            password: password,
+            language: languages.join(', ') // Save as comma separated string for now as per schema
+        });
         navigation.navigate('DriverLicense' as never);
     };
 
@@ -107,6 +133,38 @@ export default function PersonalInfoPage() {
                             onChangeText={setLastName}
                         />
                         <Text style={styles.errorText}>This field is required</Text>
+                    </View>
+
+                    {/* Password */}
+                    <View style={styles.inputGroup}>
+                        <View style={styles.labelRow}>
+                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.requiredStar}>*</Text>
+                        </View>
+                        <TextInput
+                            style={styles.input}
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder="Min. 6 characters"
+                            placeholderTextColor="#9ca3af"
+                            secureTextEntry
+                        />
+                    </View>
+
+                    {/* Confirm Password */}
+                    <View style={styles.inputGroup}>
+                        <View style={styles.labelRow}>
+                            <Text style={styles.label}>Confirm Password</Text>
+                            <Text style={styles.requiredStar}>*</Text>
+                        </View>
+                        <TextInput
+                            style={styles.input}
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                            placeholder="Re-enter password"
+                            placeholderTextColor="#9ca3af"
+                            secureTextEntry
+                        />
                     </View>
 
                     {/* Language */}

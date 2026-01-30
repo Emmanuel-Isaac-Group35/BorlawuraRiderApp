@@ -5,17 +5,20 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
-    SafeAreaView,
     Platform,
     KeyboardAvoidingView,
     ScrollView,
-    Switch
+    Switch,
+    Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function RegisterPage() {
     const navigation = useNavigation();
+    const { updateRegistrationData } = useAuth();
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [city, setCity] = useState('Accra');
@@ -23,6 +26,31 @@ export default function RegisterPage() {
 
     const handleBack = () => {
         navigation.goBack();
+    };
+
+    const handleNext = () => {
+        const trimmedEmail = email.trim();
+        const trimmedPhone = phone.trim();
+
+        if (!trimmedEmail || !trimmedPhone) {
+            // Check if fields are empty (though specific validation below is better)
+            return;
+        }
+
+        // Basic Email Validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+            Alert.alert("Invalid Email", "Please enter a valid email address.");
+            return;
+        }
+
+        updateRegistrationData({
+            email: trimmedEmail,
+            phone: trimmedPhone,
+            // Assuming city is part of profile or just local state for now, 
+            // but let's save what we can to context
+        });
+        navigation.navigate('PersonalInfo' as never);
     };
 
     return (
@@ -114,7 +142,7 @@ export default function RegisterPage() {
                     <TouchableOpacity
                         style={[styles.submitButton, !agreed ? styles.submitButtonDisabled : null]}
                         disabled={!agreed}
-                        onPress={() => navigation.navigate('PersonalInfo' as never)}
+                        onPress={handleNext}
                     >
                         <Text style={styles.submitButtonText}>Register as a rider</Text>
                     </TouchableOpacity>

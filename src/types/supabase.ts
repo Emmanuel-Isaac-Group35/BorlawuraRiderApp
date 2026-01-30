@@ -1,9 +1,15 @@
 export type Profile = {
     id: string;
     email: string | null;
-    full_name: string | null;
-    avatar_url: string | null;
     phone: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    language: string | null;
+    rider_license_number: string | null;
+    avatar_url: string | null;
+    license_photo_url: string | null;
+    ghana_card_photo_url: string | null;
+    vehicle_photo_url: string | null;
     rating: number;
     is_online: boolean;
     created_at: string;

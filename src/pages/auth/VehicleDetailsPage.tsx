@@ -4,34 +4,154 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
     Platform,
     ScrollView,
     Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function VehicleDetailsPage() {
     const navigation = useNavigation();
+    const { user, registrationData, updateRegistrationData } = useAuth();
+    const [loading, setLoading] = useState(false);
 
     const handleBack = () => {
         navigation.goBack();
     };
 
-    const handleSubmit = () => {
-        // Here you would typically gather all data and submit to backend
-        Alert.alert(
-            "Application Submitted",
-            "Your registration has been submitted successfully. We will review your documents and get back to you shortly.",
-            [
-                { text: "OK", onPress: () => navigation.navigate('Onboarding' as never) }
-            ]
-        );
+    const handleSubmit = async () => {
+        // Validation for missing critical data
+        if (!registrationData.email || !registrationData.password) {
+            Alert.alert("Error", "Missing registration data (email or password). Please restart the process.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            let userId: string | undefined;
+
+            // 1. Try to Sign Up
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: registrationData.email?.trim(),
+                password: registrationData.password,
+            });
+
+            if (authError) {
+                // If error is related to existing user or rate limit, try to Sign In instead
+                // This handles the case where the user was created in a previous attempt but profile creation failed.
+                console.log("Signup failed, attempting signin as recovery...", authError.status);
+
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                    email: registrationData.email?.trim(),
+                    password: registrationData.password,
+                });
+
+                if (signInError) {
+                    // If both failed, re-throw the original authError (or handle specific errors)
+                    // But if it's a rate limit on signup, and login failed (maybe wrong password or user doesn't actually exist in a way we can login), 
+                    // we still want to show the user meaningful info.
+                    throw authError;
+                }
+
+                userId = signInData.session?.user.id;
+            } else {
+                userId = authData.user?.id;
+            }
+
+            if (!userId) {
+                throw new Error("Failed to authenticate. Please try using a different email.");
+            }
+
+            // 2. Upsert Profile (now that we have a valid userId from either signup or signin)
+            const finalProfile = {
+                id: userId,
+                email: registrationData.email,
+                phone: registrationData.phone,
+                first_name: registrationData.first_name,
+                last_name: registrationData.last_name,
+                language: registrationData.language,
+                rider_license_number: registrationData.rider_license_number,
+
+                avatar_url: registrationData.avatar_url,
+                license_photo_url: registrationData.license_photo_url,
+                ghana_card_photo_url: registrationData.ghana_card_photo_url,
+                vehicle_photo_url: registrationData.vehicle_photo_url,
+
+                updated_at: new Date().toISOString(),
+            };
+
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .upsert(finalProfile);
+
+            if (profileError) throw profileError;
+
+            Alert.alert(
+                "Application Submitted",
+                "Your registration has been submitted successfully.",
+                [
+                    { text: "OK", onPress: () => navigation.navigate('Onboarding' as never) }
+                ]
+            );
+        } catch (error: any) {
+            // Friendly message for rate limits
+            if (error.message?.toLowerCase().includes('rate limit')) {
+                Alert.alert("Too Many Attempts", "Please wait a moment or try logging in if you already have an account.");
+            } else {
+                Alert.alert("Submission Failed", error.message);
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleUpload = (documentType: string) => {
-        console.log(`Upload ${documentType}`);
+    const handleUpload = async (documentType: string) => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                const asset = result.assets[0];
+                const fileExt = asset.uri.split('.').pop();
+                const fileName = `${Date.now()}_${documentType}.${fileExt}`;
+                const filePath = `${fileName}`;
+
+                const formData = new FormData();
+                formData.append('file', {
+                    uri: asset.uri,
+                    name: fileName,
+                    type: asset.mimeType || 'image/jpeg',
+                } as any);
+
+                const { data, error } = await supabase.storage
+                    .from('rider_documents')
+                    .upload(filePath, formData, {
+                        contentType: asset.mimeType || 'image/jpeg',
+                    });
+
+                if (error) throw error;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('rider_documents')
+                    .getPublicUrl(filePath);
+
+                updateRegistrationData({
+                    vehicle_photo_url: publicUrl
+                });
+                Alert.alert("Success", "Vehicle photo uploaded successfully");
+            }
+        } catch (error: any) {
+            console.error(error);
+            Alert.alert("Upload Failed", error.message || "An error occurred while uploading");
+        }
     };
 
     return (
