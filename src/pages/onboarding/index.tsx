@@ -33,7 +33,7 @@ export default function OnboardingPage() {
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
             <ImageBackground
-                source={require('../../../assets/onboarding_bg.png')}
+                source={require('../../../assets/tricycle_onboarding.png')}
                 style={styles.backgroundImage}
                 resizeMode="cover"
             >
