@@ -5,12 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
@@ -22,7 +22,7 @@ type RootStackParamList = {
   Support: undefined;
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type TripStatus = 'driving_to_pickup' | 'arrived_at_pickup' | 'waste_collected' | 'driving_to_disposal' | 'arrived_at_disposal';
 
@@ -105,7 +105,7 @@ export default function ActiveTripPage() {
     setShowDisposalSites(false);
     setSelectedSite(site.name);
     setShowSiteNotification(true);
-    
+
     setTimeout(() => {
       setShowSiteNotification(false);
     }, 3000);
@@ -160,8 +160,8 @@ export default function ActiveTripPage() {
                         isCompleted
                           ? '#ffffff'
                           : isCurrent
-                          ? colors.primary
-                          : colors.text.light
+                            ? colors.primary
+                            : colors.text.light
                       }
                     />
                   </View>
@@ -290,15 +290,15 @@ export default function ActiveTripPage() {
 
           {(currentStatus === 'waste_collected' ||
             currentStatus === 'driving_to_disposal') && (
-            <TouchableOpacity
-              onPress={() => setShowDisposalSites(!showDisposalSites)}
-              style={styles.disposalButton}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="business-outline" size={20} color={colors.primary} />
-              <Text style={styles.disposalButtonText}>View Disposal Sites</Text>
-            </TouchableOpacity>
-          )}
+              <TouchableOpacity
+                onPress={() => setShowDisposalSites(!showDisposalSites)}
+                style={styles.disposalButton}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="business-outline" size={20} color={colors.primary} />
+                <Text style={styles.disposalButtonText}>View Disposal Sites</Text>
+              </TouchableOpacity>
+            )}
         </View>
 
         {/* Disposal Sites List */}
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   helpCard: {
-    backgroundColor: colors.amber[50],
+    backgroundColor: colors.amber[100],
     borderWidth: 1,
     borderColor: colors.amber[100],
     borderRadius: 12,

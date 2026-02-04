@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 // Pages
 import HomePage from '../pages/home';
 import TripsPage from '../pages/trips';
-import EarningsPage from '../pages/earnings';
+import TrackingPage from '../pages/tracking';
 import ProfilePage from '../pages/profile';
 import RequestPage from '../pages/request';
 import ActiveTripPage from '../pages/active-trip';
@@ -42,8 +42,8 @@ function MainTabs() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Trips') {
             iconName = focused ? 'location' : 'location-outline';
-          } else if (route.name === 'Earnings') {
-            iconName = focused ? 'wallet' : 'wallet-outline';
+          } else if (route.name === 'Tracking') {
+            iconName = focused ? 'map' : 'map-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else {
@@ -80,9 +80,9 @@ function MainTabs() {
         options={{ title: 'Trips' }}
       />
       <Tab.Screen
-        name="Earnings"
-        component={EarningsPage}
-        options={{ title: 'Earnings' }}
+        name="Tracking"
+        component={TrackingPage}
+        options={{ title: 'Tracking' }}
       />
       <Tab.Screen
         name="Profile"

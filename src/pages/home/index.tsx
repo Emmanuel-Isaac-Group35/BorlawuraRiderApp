@@ -26,7 +26,7 @@ type RootStackParamList = {
   MainTabs: undefined;
   Request: undefined;
   Profile: undefined;
-  Earnings: undefined;
+  Tracking: undefined;
   Trips: undefined;
   Support: undefined;
 };
@@ -200,11 +200,11 @@ export default function HomePage() {
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Earnings')}
+              onPress={() => navigation.navigate('Trips')}
               style={styles.viewDetailsButton}
               activeOpacity={0.8}
             >
-              <Text style={styles.viewDetailsText}>View Details</Text>
+              <Text style={styles.viewDetailsText}>View History</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
