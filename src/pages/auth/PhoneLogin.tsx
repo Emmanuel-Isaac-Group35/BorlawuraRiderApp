@@ -49,29 +49,25 @@ export default function PhoneLoginPage() {
             // we look up the email associated with this phone in our 'riders' table.
             let loginEmail: string | undefined;
 
+            // Normalize input phone: if starts with 0, keep it AND version without it
+            const rawPhoneTrimmed = phoneNumber.trim();
+            const withLeadingZero = rawPhoneTrimmed.startsWith('0') ? rawPhoneTrimmed : `0${rawPhoneTrimmed}`;
+            const withoutLeadingZero = rawPhoneTrimmed.startsWith('0') ? rawPhoneTrimmed.substring(1) : rawPhoneTrimmed;
+            const fullPlus233 = `+233${withoutLeadingZero}`;
+            const simple233 = `233${withoutLeadingZero}`;
+
             const { data: riderData, error: riderError } = await supabase
                 .from('riders')
                 .select('email')
-                .eq('phone', fullPhone)
-                .single();
+                .or(`phone.eq.${withLeadingZero},phone.eq.${withoutLeadingZero},phone.eq.${fullPlus233},phone.eq.${simple233}`)
+                .maybeSingle();
 
             if (!riderError && riderData?.email) {
                 loginEmail = riderData.email;
-            } else {
-                // If not found by full phone, try without prefix or just clean phone
-                const { data: altData, error: altError } = await supabase
-                    .from('riders')
-                    .select('email')
-                    .or(`phone.eq.${cleanPhone},phone.eq.${phoneNumber.trim()}`)
-                    .single();
-
-                if (!altError && altData?.email) {
-                    loginEmail = altData.email;
-                }
             }
 
             if (!loginEmail) {
-                throw new Error("No account found with this phone number. Please check the number or use Email Login.");
+                throw new Error("Phone number not recognized. Please check your number or sign up if you haven't yet.");
             }
 
             // 3. Sign in using the found email

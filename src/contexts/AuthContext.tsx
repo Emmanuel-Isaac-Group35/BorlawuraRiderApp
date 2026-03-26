@@ -19,7 +19,19 @@ const AuthContext = createContext<AuthContextType>({
     profile: null,
     loading: true,
     signOut: async () => { },
-    registrationData: {},
+    registrationData: {
+        email: '',
+        phone: '',
+        first_name: '',
+        last_name: '',
+        password: '',
+        language: 'English',
+        rider_license_number: '',
+        avatar_url: '',
+        license_photo_url: '',
+        ghana_card_photo_url: '',
+        vehicle_photo_url: ''
+    },
     updateRegistrationData: () => { },
 });
 
@@ -30,7 +42,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [registrationData, setRegistrationData] = useState<Partial<Profile> & { password?: string }>({});
+    const [registrationData, setRegistrationData] = useState<Partial<Profile> & { password?: string }>({
+        email: '',
+        phone: '',
+        first_name: '',
+        last_name: '',
+        password: '',
+        language: 'English',
+        rider_license_number: '',
+        avatar_url: '',
+        license_photo_url: '',
+        ghana_card_photo_url: '',
+        vehicle_photo_url: ''
+    });
 
     useEffect(() => {
         // Get initial session
