@@ -7,6 +7,7 @@ import {
     Platform,
     ScrollView,
     Alert,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,29 +33,28 @@ export default function VehicleDetailsPage() {
         }
 
         setLoading(true);
+        const trimmedEmail = registrationData.email?.trim() || "";
+        const trimmedPassword = registrationData.password?.trim() || "";
+
         try {
             let userId: string | undefined;
 
             // 1. Try to Sign Up
             const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: registrationData.email?.trim(),
-                password: registrationData.password,
+                email: trimmedEmail,
+                password: trimmedPassword,
             });
 
             if (authError) {
                 // If error is related to existing user or rate limit, try to Sign In instead
-                // This handles the case where the user was created in a previous attempt but profile creation failed.
                 console.log("Signup failed, attempting signin as recovery...", authError.status);
 
                 const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-                    email: registrationData.email?.trim(),
-                    password: registrationData.password,
+                    email: trimmedEmail,
+                    password: trimmedPassword,
                 });
 
                 if (signInError) {
-                    // If both failed, re-throw the original authError (or handle specific errors)
-                    // But if it's a rate limit on signup, and login failed (maybe wrong password or user doesn't actually exist in a way we can login), 
-                    // we still want to show the user meaningful info.
                     throw authError;
                 }
 
@@ -86,7 +86,7 @@ export default function VehicleDetailsPage() {
             };
 
             const { error: profileError } = await supabase
-                .from('profiles')
+                .from('riders')
                 .upsert(finalProfile);
 
             if (profileError) throw profileError;
@@ -200,19 +200,38 @@ export default function VehicleDetailsPage() {
                     <Text style={styles.description}>
                         Please upload a clear photo of your tricycle. Ensure the license plate is visible.
                     </Text>
-                    <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('tricycle_photo')}>
-                        <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
-                        <Text style={styles.uploadButtonText}>Upload file</Text>
-                    </TouchableOpacity>
-                </View>
 
+                    {registrationData.vehicle_photo_url ? (
+                        <View style={styles.previewRow}>
+                            <View style={styles.smallPreviewContainer}>
+                                <Image source={{ uri: registrationData.vehicle_photo_url }} style={styles.previewImage} />
+                                <TouchableOpacity style={styles.removeImageSmall} onPress={() => updateRegistrationData({ vehicle_photo_url: '' })}>
+                                    <Ionicons name="close" size={12} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.uploadStatus}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                                <Text style={styles.uploadedText}>Uploaded</Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('tricycle_photo')}>
+                            <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
+                            <Text style={styles.uploadButtonText}>Upload file</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
 
                 {/* Navigation Buttons */}
                 <View style={styles.buttonContainer}>
                     <TouchableOpacity style={styles.backButton} onPress={handleBack}>
                         <Text style={styles.backButtonText}>Back</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                    <TouchableOpacity
+                        style={[styles.submitButton, !registrationData.vehicle_photo_url && styles.submitButtonDisabled]}
+                        onPress={handleSubmit}
+                        disabled={!registrationData.vehicle_photo_url || loading}
+                    >
                         <Text style={styles.submitButtonText}>Submit Application</Text>
                     </TouchableOpacity>
                 </View>
@@ -348,6 +367,48 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#000',
     },
+    previewRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 8,
+    },
+    smallPreviewContainer: {
+        position: 'relative',
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#f3f4f6',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    removeImageSmall: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        backgroundColor: 'rgba(239, 68, 68, 0.9)',
+        borderRadius: 10,
+        width: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    uploadStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    uploadedText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#10b981',
+    },
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -372,6 +433,10 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderRadius: 30,
         alignItems: 'center',
+    },
+    submitButtonDisabled: {
+        backgroundColor: '#9ca3af',
+        opacity: 0.7,
     },
     submitButtonText: {
         fontSize: 16,

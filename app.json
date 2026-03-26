@@ -41,7 +41,9 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Borla Wura Rider to use your location to help you navigate to pickup and disposal locations."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ]
   }
 }

@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 import { Modal } from '../../components/common/Modal';
 import { Toast } from '../../components/common/Toast';
@@ -58,6 +59,38 @@ export default function HomePage() {
       setStats(prev => ({ ...prev, rating: Number(profile.rating) }));
     }
   }, [profile]);
+
+  // Listen for new trip requests in real-time
+  useEffect(() => {
+    if (!user || !isOnline) return;
+
+    const tripsSubscription = supabase
+      .channel('new-trip-requests')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'trips',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new.status === 'pending') {
+            console.log('New trip request received:', payload.new);
+            setShowNotification(true);
+            // Optionally auto-navigate after a short delay
+            setTimeout(() => {
+              navigation.navigate('Request');
+            }, 1000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tripsSubscription);
+    };
+  }, [user, isOnline]);
 
   const loadStats = async () => {
     if (!user) return;
@@ -111,7 +144,7 @@ export default function HomePage() {
         <View style={styles.headerContent}>
           <View>
             <Text style={styles.headerSubtitle}>Welcome back,</Text>
-            <Text style={styles.headerTitle}>Kwame Owusu</Text>
+            <Text style={styles.headerTitle}>{profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : 'Rider'}</Text>
           </View>
           <TouchableOpacity
             onPress={() => navigation.navigate('Profile')}

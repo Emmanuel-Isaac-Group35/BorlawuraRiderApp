@@ -33,7 +33,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfilePage() {
   const navigation = useNavigation<NavigationProp>();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -41,9 +41,9 @@ export default function ProfilePage() {
   const [autoAccept, setAutoAccept] = useState(false);
 
   const [editForm, setEditForm] = useState({
-    name: riderProfile.name,
-    phone: riderProfile.phone,
-    email: riderProfile.email
+    name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : riderProfile.name,
+    phone: profile?.phone || riderProfile.phone,
+    email: profile?.email || riderProfile.email
   });
 
   const [bankForm, setBankForm] = useState({
@@ -141,7 +141,7 @@ export default function ProfilePage() {
           <View style={styles.profileHeader}>
             <View style={styles.profileImageContainer}>
               <Image
-                source={{ uri: riderProfile.profilePhoto }}
+                source={{ uri: profile?.avatar_url || riderProfile.profilePhoto }}
                 style={styles.profileImage}
               />
               <TouchableOpacity
@@ -153,12 +153,12 @@ export default function ProfilePage() {
               </TouchableOpacity>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{riderProfile.name}</Text>
-              <Text style={styles.profilePhone}>{riderProfile.phone}</Text>
+              <Text style={styles.profileName}>{profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : riderProfile.name}</Text>
+              <Text style={styles.profilePhone}>{profile?.phone || riderProfile.phone}</Text>
               <View style={styles.profileBadges}>
                 <View style={styles.badge}>
                   <Ionicons name="star" size={14} color="#facc15" />
-                  <Text style={styles.badgeText}>{riderProfile.rating}</Text>
+                  <Text style={styles.badgeText}>{profile?.rating || riderProfile.rating}</Text>
                 </View>
                 <View style={[styles.badge, { backgroundColor: colors.blue[100] }]}>
                   <Text style={[styles.badgeText, { color: colors.blue[600] }]}>

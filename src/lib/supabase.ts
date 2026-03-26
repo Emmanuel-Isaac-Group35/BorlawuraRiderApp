@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // TODO: Replace with your actual Supabase URL and Anon Key
 const supabaseUrl = 'https://kpdyklcickeqmybngpea.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwZHlrbGNpY2tlcW15Ym5ncGVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjQ4MzIsImV4cCI6MjA4NTEwMDgzMn0.MReZzDKwhBnrCng-Bzalqj7t-Mrf7_kZUsoV2JkrI_g'
+const supabaseAnonKey = 'sb_publishable_P_X0MALYbZjnPRkEHse_Vg_jTFaMzGG'
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Supabase URL or Key is missing!');
 } else {

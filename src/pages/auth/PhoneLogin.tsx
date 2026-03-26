@@ -8,16 +8,22 @@ import {
     KeyboardAvoidingView,
     Platform,
     TouchableWithoutFeedback,
-    Keyboard
+    Keyboard,
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../../lib/supabase';
 
 export default function PhoneLoginPage() {
     const navigation = useNavigation();
     const [phoneNumber, setPhoneNumber] = useState('');
+    const [password, setPassword] = useState('');
     const [isFocused, setIsFocused] = useState(false);
+    const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const handleBack = () => {
         navigation.goBack();
@@ -26,6 +32,66 @@ export default function PhoneLoginPage() {
     const handleClose = () => {
         navigation.navigate('Onboarding' as never);
     };
+
+    const handleLogin = async () => {
+        if (!phoneNumber || !password) {
+            Alert.alert('Error', 'Please enter your phone number and password');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // 1. Clean up phone number
+            const cleanPhone = phoneNumber.startsWith('0') ? phoneNumber.substring(1) : phoneNumber.trim();
+            const fullPhone = `+233${cleanPhone}`;
+
+            // 2. Fallback strategy: Since "Phone logins are disabled" in Supabase project settings,
+            // we look up the email associated with this phone in our 'riders' table.
+            let loginEmail: string | undefined;
+
+            const { data: riderData, error: riderError } = await supabase
+                .from('riders')
+                .select('email')
+                .eq('phone', fullPhone)
+                .single();
+
+            if (!riderError && riderData?.email) {
+                loginEmail = riderData.email;
+            } else {
+                // If not found by full phone, try without prefix or just clean phone
+                const { data: altData, error: altError } = await supabase
+                    .from('riders')
+                    .select('email')
+                    .or(`phone.eq.${cleanPhone},phone.eq.${phoneNumber.trim()}`)
+                    .single();
+
+                if (!altError && altData?.email) {
+                    loginEmail = altData.email;
+                }
+            }
+
+            if (!loginEmail) {
+                throw new Error("No account found with this phone number. Please check the number or use Email Login.");
+            }
+
+            // 3. Sign in using the found email
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: loginEmail.trim(),
+                password: password.trim(),
+            });
+
+            if (signInError) throw signInError;
+
+            // Success is handled by AuthContext state change
+        } catch (error: any) {
+            console.error("Phone Login Fallback Error:", error);
+            Alert.alert('Login Failed', error.message || "An error occurred during login.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const isFormValid = phoneNumber.length >= 9 && password.length >= 6;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -42,30 +108,50 @@ export default function PhoneLoginPage() {
                     </View>
 
                     {/* Title */}
-                    <Text style={styles.title}>Enter your phone number</Text>
+                    <Text style={styles.title}>Login with Phone</Text>
 
                     {/* Input Section */}
-                    <View style={styles.inputRow}>
-                        {/* Country Code Selector */}
-                        <TouchableOpacity style={styles.countrySelector}>
-                            <Text style={styles.flag}>🇬🇭</Text>
-                            <Text style={styles.countryCode}>+233</Text>
-                            <Ionicons name="chevron-down" size={16} color="#9ca3af" />
-                        </TouchableOpacity>
+                    <View style={styles.formContainer}>
+                        <View style={styles.inputRow}>
+                            {/* Country Code Selector */}
+                            <TouchableOpacity style={styles.countrySelector}>
+                                <Text style={styles.flag}>🇬🇭</Text>
+                                <Text style={styles.countryCode}>+233</Text>
+                                <Ionicons name="chevron-down" size={16} color="#9ca3af" />
+                            </TouchableOpacity>
 
-                        {/* Phone Input */}
+                            {/* Phone Input */}
+                            <View style={[
+                                styles.phoneInputContainer,
+                                isFocused && styles.phoneInputFocused
+                            ]}>
+                                <Text style={styles.inputLabel}>Phone number</Text>
+                                <TextInput
+                                    style={styles.phoneInput}
+                                    value={phoneNumber}
+                                    onChangeText={setPhoneNumber}
+                                    keyboardType="phone-pad"
+                                    onFocus={() => setIsFocused(true)}
+                                    onBlur={() => setIsFocused(false)}
+                                    placeholderTextColor="#9ca3af"
+                                    selectionColor="#10b981"
+                                />
+                            </View>
+                        </View>
+
+                        {/* Password Input */}
                         <View style={[
-                            styles.phoneInputContainer,
-                            isFocused && styles.phoneInputFocused
+                            styles.passwordInputContainer,
+                            isPasswordFocused && styles.phoneInputFocused
                         ]}>
-                            <Text style={styles.inputLabel}>Phone number</Text>
+                            <Text style={styles.inputLabel}>Password</Text>
                             <TextInput
                                 style={styles.phoneInput}
-                                value={phoneNumber}
-                                onChangeText={setPhoneNumber}
-                                keyboardType="phone-pad"
-                                onFocus={() => setIsFocused(true)}
-                                onBlur={() => setIsFocused(false)}
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                onFocus={() => setIsPasswordFocused(true)}
+                                onBlur={() => setIsPasswordFocused(false)}
                                 placeholderTextColor="#9ca3af"
                                 selectionColor="#10b981"
                             />
@@ -74,23 +160,28 @@ export default function PhoneLoginPage() {
 
                     {/* Disclaimer */}
                     <Text style={styles.disclaimer}>
-                        We'll send a code to verify this number. Data will never be shared with third parties without your consent.
+                        Enter the phone number and password used during registration to access your account.
                     </Text>
 
                     {/* Continue Button */}
                     <TouchableOpacity
                         style={[
                             styles.continueButton,
-                            phoneNumber.length > 0 ? styles.continueButtonActive : styles.continueButtonDisabled
+                            isFormValid ? styles.continueButtonActive : styles.continueButtonDisabled
                         ]}
-                        disabled={phoneNumber.length === 0}
+                        onPress={handleLogin}
+                        disabled={!isFormValid || loading}
                     >
-                        <Text style={[
-                            styles.continueButtonText,
-                            phoneNumber.length > 0 ? styles.continueButtonTextActive : styles.continueButtonTextDisabled
-                        ]}>
-                            Continue
-                        </Text>
+                        {loading ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                            <Text style={[
+                                styles.continueButtonText,
+                                isFormValid ? styles.continueButtonTextActive : styles.continueButtonTextDisabled
+                            ]}>
+                                Login
+                            </Text>
+                        )}
                     </TouchableOpacity>
                 </View>
             </TouchableWithoutFeedback>
@@ -123,10 +214,13 @@ const styles = StyleSheet.create({
         color: '#ffffff',
         marginBottom: 30,
     },
+    formContainer: {
+        gap: 16,
+        marginBottom: 20,
+    },
     inputRow: {
         flexDirection: 'row',
         gap: 12,
-        marginBottom: 20,
         height: 56,
     },
     countrySelector: {
@@ -156,10 +250,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         height: '100%',
     },
+    passwordInputContainer: {
+        backgroundColor: '#374151',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'transparent',
+        paddingHorizontal: 16,
+        justifyContent: 'center',
+        height: 56,
+    },
     phoneInputFocused: {
-        borderColor: '#10b981', // Green border when focused
-        backgroundColor: '#1f2937', // Darker background when focused as per design, or keep same? Design shows dark background inside green border maybe.
-        // Actually often inputs clear up or stay same. Let's keep background but add border.
+        borderColor: '#10b981',
     },
     inputLabel: {
         fontSize: 12,

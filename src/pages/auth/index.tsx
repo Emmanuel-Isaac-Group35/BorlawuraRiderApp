@@ -11,16 +11,15 @@ import {
     Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 
 export default function AuthPage({ route }: any) {
+    const navigation = useNavigation<any>();
     const { isLogin: initialIsLogin = true } = route.params || {};
-    const [isLogin, setIsLogin] = useState(initialIsLogin);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [fullName, setFullName] = useState('');
-    const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleAuth = async () => {
@@ -30,27 +29,15 @@ export default function AuthPage({ route }: any) {
         }
 
         setLoading(true);
+        const trimmedEmail = email.trim();
+        const trimmedPassword = password.trim();
+
         try {
-            if (isLogin) {
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                if (error) throw error;
-            } else {
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        data: {
-                            full_name: fullName,
-                            phone: phone,
-                        },
-                    },
-                });
-                if (error) throw error;
-                Alert.alert('Success', 'Check your email for the confirmation link!');
-            }
+            const { error } = await supabase.auth.signInWithPassword({
+                email: trimmedEmail,
+                password: trimmedPassword,
+            });
+            if (error) throw error;
         } catch (error: any) {
             Alert.alert('Error', error.message);
         } finally {
@@ -70,37 +57,10 @@ export default function AuthPage({ route }: any) {
                 style={styles.keyboardView}
             >
                 <View style={styles.formCard}>
-                    <Text style={styles.title}>
-                        {isLogin ? 'Welcome Back' : 'Create Account'}
-                    </Text>
-                    <Text style={styles.subtitle}>
-                        {isLogin ? 'Login to continue' : 'Sign up to get started'}
-                    </Text>
+                    <Text style={styles.title}>Welcome Back</Text>
+                    <Text style={styles.subtitle}>Login to continue</Text>
 
-                    {!isLogin && (
-                        <>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Full Name</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="John Doe"
-                                    value={fullName}
-                                    onChangeText={setFullName}
-                                    autoCapitalize="words"
-                                />
-                            </View>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Phone Number</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="020 123 4567"
-                                    value={phone}
-                                    onChangeText={setPhone}
-                                    keyboardType="phone-pad"
-                                />
-                            </View>
-                        </>
-                    )}
+
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Email Address</Text>
@@ -133,20 +93,16 @@ export default function AuthPage({ route }: any) {
                         {loading ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.buttonText}>
-                                {isLogin ? 'Login' : 'Sign Up'}
-                            </Text>
+                            <Text style={styles.buttonText}>Login</Text>
                         )}
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.switchButton}
-                        onPress={() => setIsLogin(!isLogin)}
+                        onPress={() => navigation.navigate('Register')}
                     >
                         <Text style={styles.switchText}>
-                            {isLogin
-                                ? "Don't have an account? Sign Up"
-                                : 'Already have an account? Login'}
+                            Don't have an account? Sign Up
                         </Text>
                     </TouchableOpacity>
                 </View>

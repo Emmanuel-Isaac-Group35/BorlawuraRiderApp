@@ -53,7 +53,7 @@ export type AuditLog = {
 export type Database = {
     public: {
         Tables: {
-            profiles: {
+            riders: {
                 Row: Profile;
                 Insert: Partial<Profile>;
                 Update: Partial<Profile>;

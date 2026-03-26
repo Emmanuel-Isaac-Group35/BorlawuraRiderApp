@@ -62,6 +62,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return () => subscription.unsubscribe();
     }, []);
 
+    // Listen for real-time profile updates
+    useEffect(() => {
+        if (!user) return;
+
+        const profileSubscription = supabase
+            .channel(`rider-profile-${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'riders',
+                    filter: `id=eq.${user.id}`,
+                },
+                (payload) => {
+                    console.log('Real-time rider profile update:', payload.new);
+                    setProfile(payload.new as Profile);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(profileSubscription);
+        };
+    }, [user]);
+
     // Refresh session on app resume
     useEffect(() => {
         const handleAppStateChange = (state: string) => {
@@ -79,7 +105,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const fetchProfile = async (userId: string) => {
         try {
             const { data, error } = await supabase
-                .from('profiles')
+                .from('riders')
                 .select('*')
                 .eq('id', userId)
                 .maybeSingle();

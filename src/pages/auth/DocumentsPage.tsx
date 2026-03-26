@@ -7,6 +7,7 @@ import {
     Platform,
     ScrollView,
     Alert,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +18,7 @@ import { supabase } from '../../lib/supabase';
 
 export default function DocumentsPage() {
     const navigation = useNavigation();
-    const { updateRegistrationData } = useAuth();
+    const { registrationData, updateRegistrationData } = useAuth();
     // Local state for 'uploaded' UI feedback could be added here
 
     const handleBack = () => {
@@ -59,11 +60,7 @@ export default function DocumentsPage() {
                         contentType: asset.mimeType || 'image/jpeg',
                     });
 
-                if (error) {
-                    // Fallback for some Expo environments where direct FormData fails - try base64 (advanced) 
-                    // OR just alert for now. Usually standard form data works in Expo Go.
-                    throw error;
-                }
+                if (error) throw error;
 
                 const { data: { publicUrl } } = supabase.storage
                     .from('rider_documents')
@@ -139,10 +136,26 @@ export default function DocumentsPage() {
                     <Text style={styles.description}>
                         Please provide a clear portrait picture (not a full body picture) of yourself. It should show your full face, front view, with eyes open. Full body pictures or images with masks or dark-glasses will not accepted
                     </Text>
-                    <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('profile_photo')}>
-                        <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
-                        <Text style={styles.uploadButtonText}>Upload file</Text>
-                    </TouchableOpacity>
+                    
+                    {registrationData.avatar_url ? (
+                        <View style={styles.previewRow}>
+                            <View style={styles.smallPreviewContainer}>
+                                <Image source={{ uri: registrationData.avatar_url }} style={styles.previewImage} />
+                                <TouchableOpacity style={styles.removeImageSmall} onPress={() => updateRegistrationData({ avatar_url: '' })}>
+                                    <Ionicons name="close" size={12} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.uploadStatus}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                                <Text style={styles.uploadedText}>Uploaded</Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('profile_photo')}>
+                            <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
+                            <Text style={styles.uploadButtonText}>Upload file</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* License Front */}
@@ -154,10 +167,26 @@ export default function DocumentsPage() {
                     <Text style={styles.description}>
                         Valid driver license issued by the Driver and Vehicle Licence Authority (DVLA). Borla Wura accepts both temporary and full-term licenses. Include a picture of the back of your temporary license if it has an extended expiration date
                     </Text>
-                    <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('license_front')}>
-                        <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
-                        <Text style={styles.uploadButtonText}>Upload file</Text>
-                    </TouchableOpacity>
+
+                    {registrationData.license_photo_url ? (
+                        <View style={styles.previewRow}>
+                            <View style={styles.smallPreviewContainer}>
+                                <Image source={{ uri: registrationData.license_photo_url }} style={styles.previewImage} />
+                                <TouchableOpacity style={styles.removeImageSmall} onPress={() => updateRegistrationData({ license_photo_url: '' })}>
+                                    <Ionicons name="close" size={12} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.uploadStatus}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                                <Text style={styles.uploadedText}>Uploaded</Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('license_front')}>
+                            <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
+                            <Text style={styles.uploadButtonText}>Upload file</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Ghana Card */}
@@ -168,10 +197,26 @@ export default function DocumentsPage() {
                     <Text style={styles.description}>
                         Please upload a front view of your Ghana Card
                     </Text>
-                    <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('ghana_card')}>
-                        <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
-                        <Text style={styles.uploadButtonText}>Upload file</Text>
-                    </TouchableOpacity>
+
+                    {registrationData.ghana_card_photo_url ? (
+                        <View style={styles.previewRow}>
+                            <View style={styles.smallPreviewContainer}>
+                                <Image source={{ uri: registrationData.ghana_card_photo_url }} style={styles.previewImage} />
+                                <TouchableOpacity style={styles.removeImageSmall} onPress={() => updateRegistrationData({ ghana_card_photo_url: '' })}>
+                                    <Ionicons name="close" size={12} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.uploadStatus}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                                <Text style={styles.uploadedText}>Uploaded</Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('ghana_card')}>
+                            <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
+                            <Text style={styles.uploadButtonText}>Upload file</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Navigation Buttons */}
@@ -328,6 +373,48 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         color: '#000',
+    },
+    previewRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 8,
+    },
+    smallPreviewContainer: {
+        position: 'relative',
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#f3f4f6',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    removeImageSmall: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        backgroundColor: 'rgba(239, 68, 68, 0.9)',
+        borderRadius: 10,
+        width: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    uploadStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    uploadedText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#10b981',
     },
     buttonContainer: {
         flexDirection: 'row',

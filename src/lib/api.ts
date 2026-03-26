@@ -86,7 +86,7 @@ export const fetchTransactions = async () => {
 
 export const toggleOnlineStatus = async (userId: string, isOnline: boolean) => {
     const { error } = await supabase
-        .from('profiles')
+        .from('riders')
         .update({ is_online: isOnline })
         .eq('id', userId);
 

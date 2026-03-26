@@ -58,9 +58,9 @@ export default function PersonalInfoPage() {
         }
 
         updateRegistrationData({
-            first_name: firstName,
-            last_name: lastName,
-            password: password,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            password: password.trim(),
             language: languages.join(', ') // Save as comma separated string for now as per schema
         });
         navigation.navigate('DriverLicense' as never);
