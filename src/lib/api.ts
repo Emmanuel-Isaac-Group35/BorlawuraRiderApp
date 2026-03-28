@@ -17,7 +17,7 @@ const mapTrip = (trip: Trip) => ({
 
 export const fetchTrips = async () => {
     const { data, error } = await supabase
-        .from('trips')
+        .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -32,7 +32,7 @@ export const fetchStats = async (userId: string) => {
     // Fetch today's earnings
     const today = new Date().toISOString().split('T')[0];
     const { data: todayTrips } = await supabase
-        .from('trips')
+        .from('orders')
         .select('fare')
         .eq('user_id', userId)
         .eq('status', 'completed')
@@ -45,7 +45,7 @@ export const fetchStats = async (userId: string) => {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const { data: weeklyTrips } = await supabase
-        .from('trips')
+        .from('orders')
         .select('fare')
         .eq('user_id', userId)
         .eq('status', 'completed')
@@ -53,10 +53,30 @@ export const fetchStats = async (userId: string) => {
 
     const weeklyEarnings = weeklyTrips?.reduce((sum, trip) => sum + trip.fare, 0) || 0;
 
+    // Fetch ALL time completed and cancelled trips to calculate acceptance rate
+    const { count: lifetimeTripsCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'completed');
+
+    const { count: cancelledTripsCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'cancelled');
+
+    const completed = lifetimeTripsCount || 0;
+    const cancelled = cancelledTripsCount || 0;
+    const totalHandled = completed + cancelled;
+    const acceptanceRate = totalHandled > 0 ? Math.round((completed / totalHandled) * 100) : 100;
+
     return {
         todayEarnings,
         weeklyEarnings,
         todayTrips: todayTripsCount,
+        totalTrips: completed,
+        acceptanceRate: acceptanceRate,
     };
 };
 

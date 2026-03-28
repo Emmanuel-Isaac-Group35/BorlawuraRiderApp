@@ -2,8 +2,10 @@ export type Profile = {
     id: string;
     email: string | null;
     phone: string | null;
+    phone_number: string | null;
     first_name: string | null;
     last_name: string | null;
+    full_name: string | null;
     language: string | null;
     rider_license_number: string | null;
     avatar_url: string | null;

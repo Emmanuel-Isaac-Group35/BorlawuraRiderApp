@@ -43,11 +43,19 @@ export default function VehicleDetailsPage() {
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: trimmedEmail,
                 password: trimmedPassword,
+                options: {
+                    data: {
+                        first_name: registrationData.first_name,
+                        last_name: registrationData.last_name,
+                        phone: registrationData.phone,
+                    }
+                }
             });
 
             if (authError) {
                 // If error is related to existing user or rate limit, try to Sign In instead
-                console.log("Signup failed, attempting signin as recovery...", authError.status);
+                console.log("Signup failed, raw error:", JSON.stringify(authError, null, 2));
+                console.log("Attempting signin as recovery... status:", authError.status);
 
                 const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
                     email: trimmedEmail,
@@ -72,8 +80,10 @@ export default function VehicleDetailsPage() {
                 id: userId,
                 email: registrationData.email,
                 phone: registrationData.phone,
+                phone_number: registrationData.phone, // required by database schema
                 first_name: registrationData.first_name,
                 last_name: registrationData.last_name,
+                full_name: `${registrationData.first_name || ''} ${registrationData.last_name || ''}`.trim(), // required by database schema
                 language: registrationData.language,
                 rider_license_number: registrationData.rider_license_number,
 

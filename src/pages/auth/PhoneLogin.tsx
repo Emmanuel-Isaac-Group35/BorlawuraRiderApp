@@ -49,18 +49,32 @@ export default function PhoneLoginPage() {
             // we look up the email associated with this phone in our 'riders' table.
             let loginEmail: string | undefined;
 
-            // Normalize input phone: if starts with 0, keep it AND version without it
-            const rawPhoneTrimmed = phoneNumber.trim();
-            const withLeadingZero = rawPhoneTrimmed.startsWith('0') ? rawPhoneTrimmed : `0${rawPhoneTrimmed}`;
-            const withoutLeadingZero = rawPhoneTrimmed.startsWith('0') ? rawPhoneTrimmed.substring(1) : rawPhoneTrimmed;
-            const fullPlus233 = `+233${withoutLeadingZero}`;
-            const simple233 = `233${withoutLeadingZero}`;
+            // Normalize input phone: strip non-numeric
+            let rawPhone = phoneNumber.replace(/\D/g, '');
+
+            // Remove 233 if exists at start (since we are handling Ghana numbers)
+            if (rawPhone.startsWith('233')) {
+                rawPhone = rawPhone.substring(3);
+            }
+            // Remove leading zero if exists
+            if (rawPhone.startsWith('0')) {
+                rawPhone = rawPhone.substring(1);
+            }
+
+            const withoutLeadingZero = rawPhone;
+            const withLeadingZero = `0${rawPhone}`;
+            const fullPlus233 = `+233${rawPhone}`;
+            const simple233 = `233${rawPhone}`;
 
             const { data: riderData, error: riderError } = await supabase
                 .from('riders')
                 .select('email')
                 .or(`phone.eq.${withLeadingZero},phone.eq.${withoutLeadingZero},phone.eq.${fullPlus233},phone.eq.${simple233}`)
                 .maybeSingle();
+
+            if (riderError) {
+                console.error("Supabase riders query error:", riderError);
+            }
 
             if (!riderError && riderData?.email) {
                 loginEmail = riderData.email;

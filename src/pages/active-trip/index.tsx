@@ -24,7 +24,7 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type TripStatus = 'driving_to_pickup' | 'arrived_at_pickup' | 'waste_collected' | 'driving_to_disposal' | 'arrived_at_disposal';
+type TripStatus = 'driving_to_pickup' | 'arrived_at_pickup' | 'waste_collected';
 
 export default function ActiveTripPage() {
   const navigation = useNavigation<NavigationProp>();
@@ -51,9 +51,7 @@ export default function ActiveTripPage() {
   const statusSteps = [
     { key: 'driving_to_pickup', label: 'Driving to Pickup', icon: 'car-outline' },
     { key: 'arrived_at_pickup', label: 'Arrived at Pickup', icon: 'location-outline' },
-    { key: 'waste_collected', label: 'Waste Collected', icon: 'checkmark-circle-outline' },
-    { key: 'driving_to_disposal', label: 'Driving to Disposal', icon: 'car-sport-outline' },
-    { key: 'arrived_at_disposal', label: 'Arrived at Disposal', icon: 'business-outline' }
+    { key: 'waste_collected', label: 'Waste Collected', icon: 'checkmark-circle-outline' }
   ];
 
   const getCurrentStepIndex = () => {
@@ -76,10 +74,6 @@ export default function ActiveTripPage() {
       case 'arrived_at_pickup':
         return 'Waste Collected';
       case 'waste_collected':
-        return 'Driving to Disposal';
-      case 'driving_to_disposal':
-        return 'Arrived at Disposal';
-      case 'arrived_at_disposal':
         return 'Complete Trip';
       default:
         return 'Next';
@@ -288,8 +282,7 @@ export default function ActiveTripPage() {
             <Text style={styles.navigateButtonText}>Open in Google Maps</Text>
           </TouchableOpacity>
 
-          {(currentStatus === 'waste_collected' ||
-            currentStatus === 'driving_to_disposal') && (
+          {currentStatus === 'waste_collected' && (
               <TouchableOpacity
                 onPress={() => setShowDisposalSites(!showDisposalSites)}
                 style={styles.disposalButton}

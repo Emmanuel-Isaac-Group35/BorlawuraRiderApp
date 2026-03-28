@@ -10,34 +10,45 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker } from 'react-native-maps';
+import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 import Svg, { Circle } from 'react-native-svg';
 
 type RootStackParamList = {
-  MainTabs: undefined;
-  ActiveTrip: undefined;
+  Request: { trip?: any };
+  ActiveTrip: { trip?: any };
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type RequestPageProps = RouteProp<RootStackParamList, 'Request'>;
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function RequestPage() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RequestPageProps>();
+  const trip = route.params?.trip;
+
   const [timeLeft, setTimeLeft] = useState(25);
   const [isAccepting, setIsAccepting] = useState(false);
   const hasDeclinedRef = useRef(false);
 
+  // Map database trip to our display object
   const request = {
-    customerName: 'Kwame Mensah',
-    pickupLocation: 'Osu Oxford Street, Accra',
-    wasteType: 'General Waste',
-    estimatedFare: 25.00,
-    distance: 2.3,
-    coordinates: { lat: 5.5557, lng: -0.1969 }
+    id: trip?.id,
+    customerName: trip?.customer_name || 'Kwame Mensah',
+    pickupLocation: trip?.pickup_location || 'Osu Oxford Street, Accra',
+    wasteType: trip?.waste_type || 'General Waste',
+    estimatedFare: Number(trip?.fare) || 25.00,
+    distance: Number(trip?.distance || 2.3),
+    coordinates: { 
+      lat: Number(trip?.pickup_lat || 5.5557), 
+      lng: Number(trip?.pickup_lng || -0.1969) 
+    }
   };
 
   useEffect(() => {
@@ -50,11 +61,29 @@ export default function RequestPage() {
     }
   }, [timeLeft]);
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     setIsAccepting(true);
-    setTimeout(() => {
-      navigation.navigate('ActiveTrip');
-    }, 800);
+    
+    try {
+      if (trip?.id) {
+        // Update trip status in database to 'active'
+        const { error } = await supabase
+          .from('orders')
+          .update({ status: 'active' })
+          .eq('id', trip.id);
+        
+        if (error) throw error;
+      }
+
+      setTimeout(() => {
+        navigation.navigate('ActiveTrip', { trip });
+      }, 800);
+    } catch (error) {
+      console.error('Error accepting trip:', error);
+      setIsAccepting(false);
+      // Fallback
+      navigation.navigate('ActiveTrip', { trip });
+    }
   };
 
   const handleDecline = () => {

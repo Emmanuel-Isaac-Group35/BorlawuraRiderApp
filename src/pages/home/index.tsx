@@ -25,7 +25,7 @@ import { Alert } from 'react-native';
 
 type RootStackParamList = {
   MainTabs: undefined;
-  Request: undefined;
+  Request: { trip?: any };
   Profile: undefined;
   Tracking: undefined;
   Trips: undefined;
@@ -42,6 +42,8 @@ export default function HomePage() {
     weeklyEarnings: 0,
     todayTrips: 0,
     rating: 5.0,
+    totalTrips: 0,
+    acceptanceRate: 100,
   });
   const [isOnline, setIsOnline] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -71,16 +73,17 @@ export default function HomePage() {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'trips',
-          filter: `user_id=eq.${user.id}`,
+          table: 'orders',
         },
         (payload) => {
-          if (payload.new.status === 'pending') {
-            console.log('New trip request received:', payload.new);
+          // Only notify if trip is pending and rider is online
+          if (payload.new.status === 'pending' && isOnline) {
+            console.log('New real-time trip request received:', payload.new);
             setShowNotification(true);
-            // Optionally auto-navigate after a short delay
+            
+            // Navigate to Request page with the real trip data
             setTimeout(() => {
-              navigation.navigate('Request');
+              navigation.navigate('Request', { trip: payload.new });
             }, 1000);
           }
         }
@@ -119,7 +122,6 @@ export default function HomePage() {
         setShowNotification(true);
         setTimeout(() => {
           setShowNotification(false);
-          navigation.navigate('Request');
         }, 1500);
       }
     } catch (error) {
@@ -257,14 +259,14 @@ export default function HomePage() {
               <View style={[styles.iconCircle, { backgroundColor: colors.blue[100] }]}>
                 <Ionicons name="location" size={20} color={colors.blue[600]} />
               </View>
-              <Text style={styles.performanceValue}>156</Text>
+              <Text style={styles.performanceValue}>{stats.totalTrips}</Text>
               <Text style={styles.performanceLabel}>Total Trips</Text>
             </View>
             <View style={styles.performanceItem}>
               <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight }]}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               </View>
-              <Text style={styles.performanceValue}>98%</Text>
+              <Text style={styles.performanceValue}>{stats.acceptanceRate}%</Text>
               <Text style={styles.performanceLabel}>Acceptance</Text>
             </View>
           </View>

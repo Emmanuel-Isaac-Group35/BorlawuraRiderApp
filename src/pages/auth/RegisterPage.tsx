@@ -30,9 +30,10 @@ export default function RegisterPage() {
 
     const handleNext = () => {
         const trimmedEmail = email.trim();
-        const trimmedPhone = phone.trim();
+        // Remove all non-numeric characters from phone
+        const cleanedPhone = phone.replace(/\D/g, ''); 
 
-        if (!trimmedEmail || !trimmedPhone) {
+        if (!trimmedEmail || !cleanedPhone) {
             // Check if fields are empty (though specific validation below is better)
             return;
         }
@@ -46,7 +47,7 @@ export default function RegisterPage() {
 
         updateRegistrationData({
             email: trimmedEmail,
-            phone: trimmedPhone,
+            phone: cleanedPhone,
             // Assuming city is part of profile or just local state for now, 
             // but let's save what we can to context
         });
