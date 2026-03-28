@@ -21,15 +21,27 @@ export type Profile = {
 export type Trip = {
     id: string;
     user_id: string;
-    customer_name: string;
-    pickup_location: string;
-    drop_location: string;
+    rider_id: string | null;
+    customer_name: string | null;
+    address: string | null;
+    pickup_location: string | null;
+    drop_location: string | null;
     waste_type: string | null;
-    fare: number;
+    waste_size: string | null;
+    amount: number | null;
+    fare: number | null;
     status: 'pending' | 'active' | 'completed' | 'cancelled';
+    sub_status: string | null;
+    notes: string | null;
     rating: number | null;
+    distance_value: number | null;
+    pickup_latitude: number | null;
+    pickup_longitude: number | null;
+    drop_latitude: number | null;
+    drop_longitude: number | null;
     created_at: string;
     pickup_time: string | null;
+    accepted_at: string | null;
     completed_at: string | null;
 };
 

@@ -4,21 +4,22 @@ import { Trip, Transaction, Profile } from '../types/supabase';
 // Map database trip to UI trip
 const mapTrip = (trip: Trip) => ({
     id: trip.id,
-    customerName: trip.customer_name,
-    pickupLocation: trip.pickup_location,
-    dropLocation: trip.drop_location,
+    customerName: trip.customer_name || 'Customer',
+    pickupLocation: trip.address || trip.pickup_location,
+    dropLocation: trip.drop_location || 'N/A',
     wasteType: trip.waste_type || 'General Waste',
-    fare: trip.fare,
+    fare: trip.amount || trip.fare || 0,
     date: new Date(trip.created_at).toISOString().split('T')[0],
     time: new Date(trip.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     rating: trip.rating || 0,
     status: trip.status,
 });
 
-export const fetchTrips = async () => {
+export const fetchTrips = async (userId: string) => {
     const { data, error } = await supabase
         .from('orders')
         .select('*')
+        .eq('rider_id', userId)
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -33,12 +34,12 @@ export const fetchStats = async (userId: string) => {
     const today = new Date().toISOString().split('T')[0];
     const { data: todayTrips } = await supabase
         .from('orders')
-        .select('fare')
-        .eq('user_id', userId)
+        .select('amount') // Changed to amount for new schema
+        .eq('rider_id', userId)
         .eq('status', 'completed')
         .gte('created_at', `${today}T00:00:00`);
 
-    const todayEarnings = todayTrips?.reduce((sum, trip) => sum + trip.fare, 0) || 0;
+    const todayEarnings = todayTrips?.reduce((sum, trip) => sum + (trip.amount || 0), 0) || 0;
     const todayTripsCount = todayTrips?.length || 0;
 
     // Fetch weekly earnings
@@ -46,24 +47,24 @@ export const fetchStats = async (userId: string) => {
     weekAgo.setDate(weekAgo.getDate() - 7);
     const { data: weeklyTrips } = await supabase
         .from('orders')
-        .select('fare')
-        .eq('user_id', userId)
+        .select('amount')
+        .eq('rider_id', userId)
         .eq('status', 'completed')
         .gte('created_at', weekAgo.toISOString());
 
-    const weeklyEarnings = weeklyTrips?.reduce((sum, trip) => sum + trip.fare, 0) || 0;
+    const weeklyEarnings = weeklyTrips?.reduce((sum, trip) => sum + (trip.amount || 0), 0) || 0;
 
     // Fetch ALL time completed and cancelled trips to calculate acceptance rate
     const { count: lifetimeTripsCount } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .eq('rider_id', userId)
         .eq('status', 'completed');
 
     const { count: cancelledTripsCount } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .eq('rider_id', userId)
         .eq('status', 'cancelled');
 
     const completed = lifetimeTripsCount || 0;

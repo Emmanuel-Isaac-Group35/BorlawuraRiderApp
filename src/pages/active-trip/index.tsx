@@ -9,19 +9,23 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 import { Toast } from '../../components/common/Toast';
+import { supabase } from '../../lib/supabase';
+import { useEffect } from 'react';
 
 type RootStackParamList = {
   MainTabs: undefined;
-  TripComplete: undefined;
+  ActiveTrip: { trip?: any };
+  TripComplete: { trip?: any };
   Support: undefined;
 };
 
+type ActiveTripRouteProp = RouteProp<RootStackParamList, 'ActiveTrip'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type TripStatus = 'driving_to_pickup' | 'arrived_at_pickup' | 'waste_collected';
@@ -34,12 +38,44 @@ export default function ActiveTripPage() {
   const [showSiteNotification, setShowSiteNotification] = useState(false);
   const [selectedSite, setSelectedSite] = useState('');
 
+  const route = useRoute<ActiveTripRouteProp>();
+  const dbTrip = route.params?.trip;
+
+  const [customerName, setCustomerName] = useState(dbTrip?.customer_name || 'Customer');
+
+  useEffect(() => {
+    async function fetchCustomerDetails() {
+      if (dbTrip?.user_id && !dbTrip?.customer_name) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name, first_name, last_name')
+          .eq('id', dbTrip.user_id)
+          .single();
+        if (data) {
+          setCustomerName(data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : 'Customer'));
+        }
+      }
+    }
+    fetchCustomerDetails();
+  }, [dbTrip?.user_id, dbTrip?.customer_name]);
+
+  let lat = Number(dbTrip?.pickup_latitude) || Number(dbTrip?.pickup_lat);
+  let lng = Number(dbTrip?.pickup_longitude) || Number(dbTrip?.pickup_lng);
+  
+  if ((!lat || !lng) && dbTrip?.notes?.includes('[GPS:')) {
+    const coordsMatch = dbTrip.notes.match(/\[GPS:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+    if (coordsMatch) {
+      lat = Number(coordsMatch[1]);
+      lng = Number(coordsMatch[2]);
+    }
+  }
+
   const tripData = {
-    customerName: 'Kwame Mensah',
-    pickupLocation: 'Osu Oxford Street, Accra',
-    wasteType: 'General Waste',
-    estimatedFare: 25.00,
-    pickupCoordinates: { lat: 5.5557, lng: -0.1969 }
+    customerName: customerName,
+    pickupLocation: dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location',
+    wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
+    estimatedFare: Number(dbTrip?.amount || dbTrip?.fare) || 0,
+    pickupCoordinates: { lat: lat || 5.6037, lng: lng || -0.1870 }
   };
 
   const disposalSites = [
@@ -58,12 +94,21 @@ export default function ActiveTripPage() {
     return statusSteps.findIndex(step => step.key === currentStatus);
   };
 
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     const currentIndex = getCurrentStepIndex();
     if (currentIndex < statusSteps.length - 1) {
-      setCurrentStatus(statusSteps[currentIndex + 1].key as TripStatus);
+      const nextStatus = statusSteps[currentIndex + 1].key as TripStatus;
+      setCurrentStatus(nextStatus);
+      
+      // Update sub_status in database
+      if (dbTrip?.id) {
+        await supabase
+          .from('orders')
+          .update({ sub_status: nextStatus })
+          .eq('id', dbTrip.id);
+      }
     } else {
-      navigation.navigate('TripComplete');
+      navigation.navigate('TripComplete', { trip: dbTrip });
     }
   };
 

@@ -8,32 +8,62 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 
+import { supabase } from '../../lib/supabase';
+import { useState, useEffect } from 'react';
+
 type RootStackParamList = {
   MainTabs: undefined;
   Earnings: undefined;
+  TripComplete: { trip?: any };
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type TripCompleteRouteProp = RouteProp<RootStackParamList, 'TripComplete'>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function TripCompletePage() {
   const navigation = useNavigation<NavigationProp>();
 
+  const route = useRoute<TripCompleteRouteProp>();
+  const dbTrip = route.params?.trip;
+
+  const [customerName, setCustomerName] = useState(dbTrip?.customer_name || 'Customer');
+
+  useEffect(() => {
+    async function fetchCustomerDetails() {
+      if (dbTrip?.user_id && !dbTrip?.customer_name) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name, first_name, last_name')
+          .eq('id', dbTrip.user_id)
+          .single();
+        if (data) {
+          setCustomerName(data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : 'Customer'));
+        }
+      }
+    }
+    fetchCustomerDetails();
+  }, [dbTrip?.user_id, dbTrip?.customer_name]);
+
+  const rawTotal = Number(dbTrip?.amount || dbTrip?.fare || 0);
+  const baseFareValue = rawTotal > 0 ? rawTotal * 0.8 : 20.00;
+  const distanceFeeValue = rawTotal > 0 ? rawTotal * 0.2 : 5.00;
+
   const tripData = {
-    customerName: 'Kwame Mensah',
-    pickupLocation: 'Osu Oxford Street, Accra',
-    dropLocation: 'Kpone Landfill Site',
-    wasteType: 'General Waste',
-    distance: 5.8,
-    duration: '28 mins',
-    baseFare: 20.00,
-    distanceFee: 5.00,
-    total: 25.00,
+    customerName: customerName,
+    pickupLocation: dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location',
+    dropLocation: dbTrip?.drop_location || 'N/A',
+    wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
+    distance: Number(dbTrip?.distance_value || dbTrip?.distance || 0),
+    duration: 'N/A mins',
+    baseFare: baseFareValue,
+    distanceFee: distanceFeeValue,
+    total: rawTotal,
     date: new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',

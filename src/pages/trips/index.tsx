@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 import { fetchTrips } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -48,13 +49,18 @@ export default function TripsPage() {
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { user } = useAuth();
+
   React.useEffect(() => {
-    loadTrips();
-  }, []);
+    if (user?.id) {
+      loadTrips();
+    }
+  }, [user?.id]);
 
   const loadTrips = async () => {
+    if (!user?.id) return;
     try {
-      const data = await fetchTrips();
+      const data = await fetchTrips(user.id);
       // @ts-ignore - mismatch in status string literal type vs generic string
       setAllTrips(data);
     } catch (error) {

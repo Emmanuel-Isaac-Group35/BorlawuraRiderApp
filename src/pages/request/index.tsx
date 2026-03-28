@@ -18,6 +18,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 import Svg, { Circle } from 'react-native-svg';
+import { useAuth } from '../../contexts/AuthContext';
 
 type RootStackParamList = {
   Request: { trip?: any };
@@ -32,26 +33,56 @@ export default function RequestPage() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RequestPageProps>();
   const trip = route.params?.trip;
+  const { user } = useAuth();
 
   const [timeLeft, setTimeLeft] = useState(25);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [customerName, setCustomerName] = useState(trip?.customer_name || 'Customer');
   const hasDeclinedRef = useRef(false);
+
+  useEffect(() => {
+    async function fetchCustomerDetails() {
+      if (trip?.user_id && !trip?.customer_name) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name, first_name, last_name')
+          .eq('id', trip.user_id)
+          .single();
+        if (data) {
+          setCustomerName(data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : 'Customer'));
+        }
+      }
+    }
+    fetchCustomerDetails();
+  }, [trip?.user_id, trip?.customer_name]);
+
+  let lat = Number(trip?.pickup_latitude) || Number(trip?.pickup_lat);
+  let lng = Number(trip?.pickup_longitude) || Number(trip?.pickup_lng);
+  
+  if ((!lat || !lng) && trip?.notes?.includes('[GPS:')) {
+    const coordsMatch = trip.notes.match(/\[GPS:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+    if (coordsMatch) {
+      lat = Number(coordsMatch[1]);
+      lng = Number(coordsMatch[2]);
+    }
+  }
 
   // Map database trip to our display object
   const request = {
     id: trip?.id,
-    customerName: trip?.customer_name || 'Kwame Mensah',
-    pickupLocation: trip?.pickup_location || 'Osu Oxford Street, Accra',
-    wasteType: trip?.waste_type || 'General Waste',
-    estimatedFare: Number(trip?.fare) || 25.00,
-    distance: Number(trip?.distance || 2.3),
+    customerName: customerName,
+    pickupLocation: trip?.address || trip?.pickup_location || 'Pickup Location',
+    wasteType: trip?.waste_type || trip?.waste_size || 'General Waste',
+    estimatedFare: Number(trip?.amount || trip?.fare) || 0,
+    distance: Number(trip?.distance_value || trip?.distance || 0),
     coordinates: { 
-      lat: Number(trip?.pickup_lat || 5.5557), 
-      lng: Number(trip?.pickup_lng || -0.1969) 
+      lat: lat || 5.6037, 
+      lng: lng || -0.1870 
     }
   };
 
   useEffect(() => {
+    if (isAccepting) return; // Stop timer while accepting
     if (timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
@@ -59,30 +90,34 @@ export default function RequestPage() {
       hasDeclinedRef.current = true;
       handleDecline();
     }
-  }, [timeLeft]);
+  }, [timeLeft, isAccepting]);
 
   const handleAccept = async () => {
     setIsAccepting(true);
     
     try {
-      if (trip?.id) {
-        // Update trip status in database to 'active'
+      if (trip?.id && user?.id) {
+        // Update trip status in database to 'active' and assign to rider
         const { error } = await supabase
           .from('orders')
-          .update({ status: 'active' })
+          .update({ 
+             status: 'active',
+             sub_status: 'assigned',
+             rider_id: user.id,
+             accepted_at: new Date().toISOString()
+          })
           .eq('id', trip.id);
         
         if (error) throw error;
       }
 
-      setTimeout(() => {
-        navigation.navigate('ActiveTrip', { trip });
-      }, 800);
+      setIsAccepting(false);
+      navigation.replace('ActiveTrip', { trip });
     } catch (error) {
       console.error('Error accepting trip:', error);
       setIsAccepting(false);
       // Fallback
-      navigation.navigate('ActiveTrip', { trip });
+      navigation.replace('ActiveTrip', { trip });
     }
   };
 

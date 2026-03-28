@@ -1,0 +1,26 @@
+﻿src/App.tsx(1,31): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/components/feature/BottomNav.tsx(2,42): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/i18n/index.ts(9,5): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(callback?: Callback | undefined): Promise<TFunction<"translation", undefined>>', gave the following error.
+    Object literal may only specify known properties, and 'compatibilityJSON' does not exist in type 'Callback'.
+  Overload 2 of 2, '(options: InitOptions<unknown>, callback?: Callback | undefined): Promise<TFunction<"translation", undefined>>', gave the following error.
+    Type '"v3"' is not assignable to type '"v4"'.
+src/main.tsx(3,28): error TS7016: Could not find a declaration file for module 'react-dom/client'. 'C:/final year project/BorlawuraRiderApp/node_modules/react-dom/client.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/react-dom` if it exists or add a new declaration (.d.ts) file containing `declare module 'react-dom/client';`
+src/main.tsx(5,17): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+src/pages/active-trip/page.tsx(2,29): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/pages/earnings/page.tsx(2,29): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/pages/home/page.tsx(2,29): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/pages/onboarding/index.tsx(20,29): error TS2345: Argument of type '[string, { isLogin: boolean; }]' is not assignable to parameter of type 'never'.
+src/pages/profile/page.tsx(2,29): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/pages/request/page.tsx(2,29): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/pages/support/index.tsx(16,37): error TS2307: Cannot find module '@react-navigation/stack' or its corresponding type declarations.
+src/pages/support/page.tsx(3,29): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/pages/trip-complete/page.tsx(2,29): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/pages/trips/page.tsx(20,20): error TS2552: Cannot find name 'useNavigate'. Did you mean 'navigate'?
+src/router/config.tsx(2,34): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/router/index.ts(1,52): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+src/router/index.ts(2,27): error TS2307: Cannot find module 'react-router-dom' or its corresponding type declarations.
+vite.config.ts(1,30): error TS2307: Cannot find module 'vite' or its corresponding type declarations.
+vite.config.ts(2,19): error TS2307: Cannot find module '@vitejs/plugin-react-swc' or its corresponding type declarations.
+vite.config.ts(4,24): error TS2307: Cannot find module 'unplugin-auto-import/vite' or its corresponding type declarations.
