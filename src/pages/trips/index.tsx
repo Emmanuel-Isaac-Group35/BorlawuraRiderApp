@@ -15,7 +15,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
+import { supabase } from '../../lib/supabase';
 import { fetchTrips } from '../../lib/api';
+
 import { useAuth } from '../../contexts/AuthContext';
 
 type RootStackParamList = {
@@ -69,6 +71,33 @@ export default function TripsPage() {
       setLoading(false);
     }
   };
+
+  // Real-time listener for trip updates
+  React.useEffect(() => {
+    if (!user?.id) return;
+
+    const tripsChannel = supabase
+      .channel('trips-history-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for ALL events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'orders',
+          filter: `rider_id=eq.${user.id}`,
+        },
+        () => {
+          console.log('Real-time trip update detected, refreshing history...');
+          loadTrips();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tripsChannel);
+    };
+  }, [user?.id]);
+
 
   const filterTrips = () => {
     const today = new Date();

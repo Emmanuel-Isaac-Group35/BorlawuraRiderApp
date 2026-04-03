@@ -20,8 +20,9 @@ import { Modal } from '../../components/common/Modal';
 import { Toast } from '../../components/common/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchStats, toggleOnlineStatus } from '../../lib/api';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -49,18 +50,36 @@ export default function HomePage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadStats();
-    }
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        loadStats();
+      }
+    }, [user])
+  );
 
   useEffect(() => {
     if (profile) {
-      setIsOnline(profile.is_online);
+      // Remove automatic sync of is_online from profile 
+      // to ensure rider starts offline on sign in
       setStats(prev => ({ ...prev, rating: Number(profile.rating) }));
     }
   }, [profile]);
+
+  // Ensure rider is offline when they first enter the home page (app start/sign in)
+  useEffect(() => {
+    const initializeOffline = async () => {
+      if (user) {
+        try {
+          await updateOnlineStatus(false);
+        } catch (error) {
+          console.error('Error initializing offline status:', error);
+        }
+      }
+    };
+    initializeOffline();
+  }, [user]);
+
 
   // Listen for new trip requests in real-time
   useEffect(() => {
@@ -75,20 +94,75 @@ export default function HomePage() {
           schema: 'public',
           table: 'orders',
         },
-        (payload) => {
+        async (payload) => {
           // Only notify if trip is pending and rider is online
           if (payload.new.status === 'pending' && isOnline) {
             console.log('New real-time trip request received:', payload.new);
+            
+            // Broad name resolution logic for every possible field variant
+            let enrichedTrip = { ...payload.new };
+            const tripId = payload.new.user_id || payload.new.userId || payload.new.customer_id;
+            
+            // Try to find a name already in any possible payload field
+            const existingName = payload.new.customer_name || payload.new.customerName || 
+                             payload.new.user_name || payload.new.userName || 
+                             payload.new.full_name || payload.new.fullName ||
+                             payload.new.client_name || payload.new.clientName ||
+                             (payload.new.first_name ? `${payload.new.first_name} ${payload.new.last_name || ''}`.trim() : null);
+
+            
+            if (tripId && (!existingName || existingName === 'Customer')) {
+              try {
+                // Try profiles first, handle 42P01 if missing
+                let { data: profile, error } = await supabase
+                  .from('profiles')
+                  .select('full_name, first_name, last_name, email')
+                  .eq('id', tripId)
+                  .maybeSingle();
+                
+                // Fallback to riders if no profile record OR profiles table doesn't exist (42P01)
+                if (!profile || error?.code === '42P01') {
+                   const { data: riderProfile } = await supabase
+                    .from('riders')
+                    .select('first_name, last_name, email')
+                    .eq('id', tripId)
+                    .maybeSingle();
+                   if (riderProfile) profile = { ...riderProfile, full_name: null } as any;
+                }
+
+
+                if (profile) {
+                  const resolvedName = profile.full_name || 
+                                              (profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : 
+                                              (profile.email?.split('@')[0] || 'Customer'));
+                  enrichedTrip.customer_name = resolvedName;
+
+                  // Persistence: Fix the database record automatically
+                  await supabase
+                    .from('orders')
+                    .update({ customer_name: resolvedName })
+                    .eq('id', payload.new.id);
+                }
+              } catch (err) {
+                console.error('Error fetching/updating customer profile:', err);
+              }
+            } else if (existingName && existingName !== 'Customer') {
+               enrichedTrip.customer_name = existingName;
+            }
+
+
             setShowNotification(true);
             
-            // Navigate to Request page with the real trip data
+            // Navigate with the enriched data
             setTimeout(() => {
-              navigation.navigate('Request', { trip: payload.new });
+              navigation.navigate('Request', { trip: enrichedTrip });
             }, 1000);
           }
         }
       )
       .subscribe();
+
+
 
     return () => {
       supabase.removeChannel(tripsSubscription);
@@ -287,16 +361,6 @@ export default function HomePage() {
               <Text style={styles.actionLabel}>History</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Trips')}
-              style={styles.actionItem}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.primaryLight }]}>
-                <Ionicons name="map-outline" size={20} color={colors.primary} />
-              </View>
-              <Text style={styles.actionLabel}>Routes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               onPress={() => navigation.navigate('Support')}
               style={styles.actionItem}
               activeOpacity={0.7}
@@ -308,6 +372,8 @@ export default function HomePage() {
             </TouchableOpacity>
           </View>
         </View>
+
+
 
         {/* Tips Card */}
         <View style={styles.tipCard}>

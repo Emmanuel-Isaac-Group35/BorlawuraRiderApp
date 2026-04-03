@@ -31,16 +31,39 @@ export default function TrackingPage() {
     const [isTracking, setIsTracking] = useState(false);
 
     useEffect(() => {
-        (async () => {
-            let { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                setErrorMsg('Permission to access location was denied');
-                return;
-            }
+        const initializeLocation = async () => {
+            try {
+                let { status } = await Location.requestForegroundPermissionsAsync();
+                if (status !== 'granted') {
+                    setErrorMsg('Permission to access location was denied');
+                    return;
+                }
 
-            let location = await Location.getCurrentPositionAsync({});
-            setLocation(location);
-        })();
+                let loc = await Location.getLastKnownPositionAsync({});
+                if (!loc) {
+                    loc = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced,
+                    });
+                }
+                setLocation(loc);
+            } catch (err) {
+                console.warn('Initial tracking location fix failed:', err);
+                // Fallback to a default location (Accra Mall) if detection fails
+                setLocation({
+                    coords: {
+                        latitude: 5.6227,
+                        longitude: -0.1733,
+                        altitude: 0,
+                        accuracy: 0,
+                        altitudeAccuracy: 0,
+                        heading: 0,
+                        speed: 0,
+                    },
+                    timestamp: Date.now(),
+                });
+            }
+        };
+        initializeLocation();
     }, []);
 
     useEffect(() => {

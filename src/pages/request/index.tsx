@@ -19,6 +19,8 @@ import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuth } from '../../contexts/AuthContext';
+import * as Location from 'expo-location';
+
 
 type RootStackParamList = {
   Request: { trip?: any };
@@ -37,52 +39,133 @@ export default function RequestPage() {
 
   const [timeLeft, setTimeLeft] = useState(25);
   const [isAccepting, setIsAccepting] = useState(false);
-  const [customerName, setCustomerName] = useState(trip?.customer_name || 'Customer');
+  const [customerName, setCustomerName] = useState('Customer');
+  const [pickupAddress, setPickupAddress] = useState('Pickup Location');
+  const [tripDistance, setTripDistance] = useState(0);
+  const [tripCoords, setTripCoords] = useState({ lat: 5.6037, lng: -0.1870 });
+  const [fullTripData, setFullTripData] = useState(trip);
+
   const hasDeclinedRef = useRef(false);
 
   useEffect(() => {
-    async function fetchCustomerDetails() {
-      if (trip?.user_id && !trip?.customer_name) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('full_name, first_name, last_name')
-          .eq('id', trip.user_id)
-          .single();
-        if (data) {
-          setCustomerName(data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : 'Customer'));
+    async function resolveAllTripData() {
+      if (!trip?.id) return;
+
+      try {
+        // 1. Fetch Full Trip Data from DB to ensure nothing is missing from params
+        const { data: dbData } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('id', trip.id)
+          .maybeSingle();
+        
+        const currentTrip = dbData || trip;
+        setFullTripData(currentTrip);
+
+        // 2. Resolve Name
+        const tripId = currentTrip.user_id || currentTrip.userId || currentTrip.customer_id;
+        let resolvedName = currentTrip.customer_name || currentTrip.customerName || 
+                           currentTrip.user_name || currentTrip.userName || 
+                           currentTrip.full_name || currentTrip.fullName || 
+                           (currentTrip.first_name ? `${currentTrip.first_name} ${currentTrip.last_name || ''}`.trim() : null);
+
+        if (tripId && (!resolvedName || resolvedName === 'Customer')) {
+          let { data: profile } = await supabase.from('profiles').select('*').eq('id', tripId).maybeSingle();
+          if (!profile) {
+              const { data: userRecord } = await supabase.from('users').select('*').eq('id', tripId).maybeSingle();
+              if (userRecord) {
+                // @ts-ignore
+                profile = { ...userRecord, first_name: null, last_name: null };
+              }
+          }
+          if (!profile) {
+              const { data: riderProfile } = await supabase.from('riders').select('*').eq('id', tripId).maybeSingle();
+              profile = riderProfile;
+          }
+          if (profile) {
+            resolvedName = profile.full_name || (profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : (profile.email?.split('@')[0]));
+            if (resolvedName) {
+              // Update database record for future reference
+              await supabase.from('orders').update({ customer_name: resolvedName }).eq('id', trip.id);
+            }
+          }
         }
+        setCustomerName(resolvedName || (tripId ? `Customer #${tripId.substring(0, 4)}` : 'Customer'));
+
+        // 3. Resolve Address
+        let addr = currentTrip.address || currentTrip.pickup_location || '';
+        addr = addr.trim().replace(/^,\s*/, '').replace(/,\s*$/, ''); // Clean leading/trailing commas
+        setPickupAddress(addr || 'Pickup Location');
+
+        // 4. Resolve Distance & Coordinates
+        let lat = Number(currentTrip.pickup_latitude || currentTrip.pickup_lat);
+        let lng = Number(currentTrip.pickup_longitude || currentTrip.pickup_lng);
+        
+        if ((!lat || !lng) && currentTrip.notes?.includes('[GPS:')) {
+           const coordsMatch = currentTrip.notes.match(/\[GPS:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
+           if (coordsMatch) { lat = Number(coordsMatch[1]); lng = Number(coordsMatch[2]); }
+        }
+        
+        if (lat && lng) {
+          setTripCoords({ lat, lng });
+          
+          try {
+            // Calculate distance to rider's real location with robust error handling
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+              let riderLoc = await Location.getLastKnownPositionAsync({});
+              if (!riderLoc) {
+                riderLoc = await Location.getCurrentPositionAsync({
+                  accuracy: Location.Accuracy.Balanced,
+                });
+              }
+              
+              if (riderLoc) {
+                const dist = calculateHaversine(
+                  riderLoc.coords.latitude, riderLoc.coords.longitude,
+                  lat, lng
+                );
+                setTripDistance(Number(dist.toFixed(1)));
+              }
+            }
+          } catch (locationError) {
+            console.error('Location detection failure in Request index.tsx:', locationError);
+            setTripDistance(Number(currentTrip.distance_value || currentTrip.distance || 0));
+          }
+        } else {
+          setTripDistance(Number(currentTrip.distance_value || currentTrip.distance || 0));
+        }
+
+      } catch (err) {
+        console.error('Error resolving trip data:', err);
       }
     }
-    fetchCustomerDetails();
-  }, [trip?.user_id, trip?.customer_name]);
+    resolveAllTripData();
+  }, [trip?.id]);
 
-  let lat = Number(trip?.pickup_latitude) || Number(trip?.pickup_lat);
-  let lng = Number(trip?.pickup_longitude) || Number(trip?.pickup_lng);
-  
-  if ((!lat || !lng) && trip?.notes?.includes('[GPS:')) {
-    const coordsMatch = trip.notes.match(/\[GPS:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
-    if (coordsMatch) {
-      lat = Number(coordsMatch[1]);
-      lng = Number(coordsMatch[2]);
-    }
-  }
+  const calculateHaversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
-  // Map database trip to our display object
   const request = {
-    id: trip?.id,
+    id: fullTripData?.id,
     customerName: customerName,
-    pickupLocation: trip?.address || trip?.pickup_location || 'Pickup Location',
-    wasteType: trip?.waste_type || trip?.waste_size || 'General Waste',
-    estimatedFare: Number(trip?.amount || trip?.fare) || 0,
-    distance: Number(trip?.distance_value || trip?.distance || 0),
-    coordinates: { 
-      lat: lat || 5.6037, 
-      lng: lng || -0.1870 
-    }
+    pickupLocation: pickupAddress,
+    wasteType: fullTripData?.waste_type || fullTripData?.waste_size || 'General Waste',
+    estimatedFare: Number(fullTripData?.amount || fullTripData?.fare) || 0,
+    distance: tripDistance,
+    coordinates: tripCoords
   };
 
   useEffect(() => {
-    if (isAccepting) return; // Stop timer while accepting
+    if (isAccepting) return;
     if (timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
@@ -91,6 +174,7 @@ export default function RequestPage() {
       handleDecline();
     }
   }, [timeLeft, isAccepting]);
+
 
   const handleAccept = async () => {
     setIsAccepting(true);

@@ -30,12 +30,47 @@ type RootStackParamList = {
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 import { useAuth } from '../../contexts/AuthContext';
+import { fetchStats } from '../../lib/api';
+
+
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 export default function ProfilePage() {
   const navigation = useNavigation<NavigationProp>();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user } = useAuth();
+  const [stats, setStats] = useState({ totalTrips: 0, rating: 5.0 });
+  const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+         loadRiderStats();
+      }
+    }, [user?.id, profile?.rating]) // Include profile.rating as dependency
+  );
+
+
+  const loadRiderStats = async () => {
+     try {
+       if (user?.id) {
+          const data = await fetchStats(user.id);
+          // @ts-ignore - mismatch in object structure vs state
+          setStats({
+            totalTrips: data.totalTrips,
+            rating: profile?.rating || 5.0
+          });
+       }
+     } catch (e) {
+       console.error('Error loading profile stats:', e);
+     } finally {
+       setLoading(false);
+     }
+  };
+
   const [showBankModal, setShowBankModal] = useState(false);
+
   const [pushNotifications, setPushNotifications] = useState(true);
   const [soundAlerts, setSoundAlerts] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
@@ -158,14 +193,15 @@ export default function ProfilePage() {
               <View style={styles.profileBadges}>
                 <View style={styles.badge}>
                   <Ionicons name="star" size={14} color="#facc15" />
-                  <Text style={styles.badgeText}>{profile?.rating || riderProfile.rating}</Text>
+                  <Text style={styles.badgeText}>{stats.rating.toFixed(1)}</Text>
                 </View>
                 <View style={[styles.badge, { backgroundColor: colors.blue[100] }]}>
                   <Text style={[styles.badgeText, { color: colors.blue[600] }]}>
-                    {riderProfile.totalTrips} trips
+                    {stats.totalTrips} {stats.totalTrips === 1 ? 'trip' : 'trips'}
                   </Text>
                 </View>
               </View>
+
             </View>
           </View>
           <TouchableOpacity

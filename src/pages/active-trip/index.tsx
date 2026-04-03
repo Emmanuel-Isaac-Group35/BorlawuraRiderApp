@@ -41,23 +41,76 @@ export default function ActiveTripPage() {
   const route = useRoute<ActiveTripRouteProp>();
   const dbTrip = route.params?.trip;
 
-  const [customerName, setCustomerName] = useState(dbTrip?.customer_name || 'Customer');
+  const [customerName, setCustomerName] = useState(
+    (dbTrip?.customer_name && dbTrip?.customer_name !== 'Customer') ? dbTrip.customer_name : 
+    (dbTrip?.customerName && dbTrip?.customerName !== 'Customer') ? dbTrip.customerName :
+    (dbTrip?.user_name) ? dbTrip.user_name : 
+    (dbTrip?.full_name) ? dbTrip.full_name :
+    'Customer'
+  );
+
 
   useEffect(() => {
     async function fetchCustomerDetails() {
-      if (dbTrip?.user_id && !dbTrip?.customer_name) {
-        const { data } = await supabase
+      const tripId = dbTrip?.user_id || dbTrip?.userId || dbTrip?.customer_id;
+      const currentName = customerName;
+
+      if (tripId && (!currentName || currentName === 'Customer')) {
+        // Try profiles first, handle 42P01 (missing table) gracefully
+        let { data, error } = await supabase
           .from('profiles')
-          .select('full_name, first_name, last_name')
-          .eq('id', dbTrip.user_id)
-          .single();
+          .select('full_name, first_name, last_name, email')
+          .eq('id', tripId)
+          .maybeSingle();
+
+        // Fallback to users if profile/rider missing
+        if (!data || error?.code === '42P01') {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('full_name, phone_number, email')
+            .eq('id', tripId)
+            .maybeSingle();
+          if (userData) {
+            // @ts-ignore
+            data = { ...userData, first_name: null, last_name: null };
+          }
+        }
+
+        // Fallback to riders if still missing
+        if (!data) {
+          const { data: riderData } = await supabase
+            .from('riders')
+            .select('first_name, last_name, email, phone_number')
+            .eq('id', tripId)
+            .maybeSingle();
+          if (riderData) {
+            // @ts-ignore
+            data = { ...riderData, full_name: null };
+          }
+        }
+
         if (data) {
-          setCustomerName(data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : 'Customer'));
+          const resolvedName = data.full_name || 
+                              (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : 
+                              (data.email?.split('@')[0] || 'Customer'));
+          setCustomerName(resolvedName);
+          
+          // Persistence: Update the database record if it was missing
+          if (dbTrip?.id && (!dbTrip.customer_name || dbTrip.customer_name === 'Customer')) {
+            await supabase
+              .from('orders')
+              .update({ customer_name: resolvedName })
+              .eq('id', dbTrip.id);
+          }
         }
       }
     }
     fetchCustomerDetails();
-  }, [dbTrip?.user_id, dbTrip?.customer_name]);
+  }, [dbTrip?.user_id, dbTrip?.userId, dbTrip?.customer_id, dbTrip?.customer_name, dbTrip?.customerName]);
+
+
+
+
 
   let lat = Number(dbTrip?.pickup_latitude) || Number(dbTrip?.pickup_lat);
   let lng = Number(dbTrip?.pickup_longitude) || Number(dbTrip?.pickup_lng);
@@ -126,12 +179,16 @@ export default function ActiveTripPage() {
   };
 
   const handleCall = () => {
-    Linking.openURL('tel:+233501234567');
+    const phoneFromNotes = dbTrip?.notes?.match(/\[Phone:\s*(\+?\d+)\]/)?.[1];
+    const phone = dbTrip?.customer_phone || dbTrip?.customerPhone || phoneFromNotes || '+233501234567';
+    Linking.openURL(`tel:${phone}`);
     setShowContactMenu(false);
   };
 
   const handleMessage = () => {
-    Linking.openURL('sms:+233501234567');
+    const phoneFromNotes = dbTrip?.notes?.match(/\[Phone:\s*(\+?\d+)\]/)?.[1];
+    const phone = dbTrip?.customer_phone || dbTrip?.customerPhone || phoneFromNotes || '+233501234567';
+    Linking.openURL(`sms:${phone}`);
     setShowContactMenu(false);
   };
 

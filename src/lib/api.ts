@@ -2,9 +2,12 @@ import { supabase } from './supabase';
 import { Trip, Transaction, Profile } from '../types/supabase';
 
 // Map database trip to UI trip
-const mapTrip = (trip: Trip) => ({
+const mapTrip = (trip: any) => ({
     id: trip.id,
-    customerName: trip.customer_name || 'Customer',
+    customerName: (trip.customer_name && trip.customer_name !== 'Customer') ? trip.customer_name : 
+                 trip.customer?.full_name || 
+                 (trip.customer?.first_name ? `${trip.customer.first_name} ${trip.customer.last_name || ''}`.trim() : 
+                 (trip.customer?.email?.split('@')[0] || 'Customer')),
     pickupLocation: trip.address || trip.pickup_location,
     dropLocation: trip.drop_location || 'N/A',
     wasteType: trip.waste_type || 'General Waste',
@@ -15,8 +18,10 @@ const mapTrip = (trip: Trip) => ({
     status: trip.status,
 });
 
+
 export const fetchTrips = async (userId: string) => {
-    const { data, error } = await supabase
+    // Fetch orders first
+    const { data: orders, error } = await supabase
         .from('orders')
         .select('*')
         .eq('rider_id', userId)
@@ -26,15 +31,72 @@ export const fetchTrips = async (userId: string) => {
         throw error;
     }
 
-    return (data || []).map(mapTrip);
+    if (!orders || orders.length === 0) return [];
+
+    // Fetch unique user profiles to get names
+    const userIds = [...new Set(orders.map(o => o.user_id).filter(id => !!id))];
+    let { data: profiles, error: profileErr } = await supabase
+        .from('profiles')
+        .select('id, full_name, first_name, last_name, email')
+        .in('id', userIds);
+
+    // Fallback to riders if profiles is missing (42P01 or no data)
+    if (!profiles || profileErr?.code === '42P01') {
+        const { data: riders } = await supabase
+            .from('riders')
+            .select('id, first_name, last_name, email')
+            .in('id', userIds);
+        profiles = (riders || []).map(r => ({ ...r, full_name: null })) as any;
+    }
+
+    const profileMap = (profiles || []).reduce((map: any, p: any) => {
+        map[p.id] = p.full_name || 
+                   p.fullName || 
+                   (p.first_name ? `${p.first_name} ${p.last_name || ''}`.trim() : 
+                   (p.email?.split('@')[0] || null));
+        return map;
+    }, {} as any);
+
+    return orders.map(order => {
+        // High-res name detection searching every conceivable field
+        const resolvedName = order.customer_name || 
+                           order.customerName || 
+                           order.user_name || 
+                           order.userName || 
+                           order.full_name || 
+                           order.fullName || 
+                           order.name ||
+                           order.client_name ||
+                           (order.first_name ? `${order.first_name} ${order.last_name || ''}`.trim() : null) || 
+                           profileMap[order.user_id] || 
+                           profileMap[order.userId] || 
+                           profileMap[order.customer_id] || 
+                           profileMap[order.rider_id] || // Check rider if all else fails
+                           'Customer';
+
+        return {
+            ...mapTrip(order),
+            // Ensure we never return the generic 'Customer' if we have a profile match
+            customerName: (resolvedName === 'Customer' && profileMap[order.user_id]) 
+                ? profileMap[order.user_id] 
+                : resolvedName
+        };
+    });
 };
 
+
+
+
+
+
+
 export const fetchStats = async (userId: string) => {
-    // Fetch today's earnings
     const today = new Date().toISOString().split('T')[0];
+    
+    // Fetch today's earnings and count locally for accuracy
     const { data: todayTrips } = await supabase
         .from('orders')
-        .select('amount') // Changed to amount for new schema
+        .select('amount')
         .eq('rider_id', userId)
         .eq('status', 'completed')
         .gte('created_at', `${today}T00:00:00`);
@@ -42,44 +104,36 @@ export const fetchStats = async (userId: string) => {
     const todayEarnings = todayTrips?.reduce((sum, trip) => sum + (trip.amount || 0), 0) || 0;
     const todayTripsCount = todayTrips?.length || 0;
 
-    // Fetch weekly earnings
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const { data: weeklyTrips } = await supabase
+    // Fetch ALL time trips handled (excluding cancelled)
+    const { data: tripsHandle, error: tripsError } = await supabase
         .from('orders')
-        .select('amount')
+        .select('status')
         .eq('rider_id', userId)
-        .eq('status', 'completed')
-        .gte('created_at', weekAgo.toISOString());
+        .neq('status', 'cancelled');
 
-    const weeklyEarnings = weeklyTrips?.reduce((sum, trip) => sum + (trip.amount || 0), 0) || 0;
+    const totalTrips = tripsHandle?.length || 0;
 
-    // Fetch ALL time completed and cancelled trips to calculate acceptance rate
-    const { count: lifetimeTripsCount } = await supabase
+
+    // Acceptance rate logic
+    const { count: totalHandled } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('rider_id', userId)
-        .eq('status', 'completed');
+        .in('status', ['completed', 'cancelled']);
 
-    const { count: cancelledTripsCount } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('rider_id', userId)
-        .eq('status', 'cancelled');
-
-    const completed = lifetimeTripsCount || 0;
-    const cancelled = cancelledTripsCount || 0;
-    const totalHandled = completed + cancelled;
-    const acceptanceRate = totalHandled > 0 ? Math.round((completed / totalHandled) * 100) : 100;
+    const acceptanceRate = (totalHandled && totalHandled > 0) 
+        ? Math.round((totalTrips / totalHandled) * 100) 
+        : 100;
 
     return {
         todayEarnings,
-        weeklyEarnings,
+        weeklyEarnings: 0, // Simplified for now since we focus on trip counts
         todayTrips: todayTripsCount,
-        totalTrips: completed,
+        totalTrips: totalTrips,
         acceptanceRate: acceptanceRate,
     };
 };
+
 
 // Map database transaction to UI transaction
 const mapTransaction = (tx: Transaction) => ({

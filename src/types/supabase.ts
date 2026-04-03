@@ -13,7 +13,9 @@ export type Profile = {
     ghana_card_photo_url: string | null;
     vehicle_photo_url: string | null;
     rating: number;
+    total_trips: number;
     is_online: boolean;
+
     created_at: string;
     updated_at: string;
 };
