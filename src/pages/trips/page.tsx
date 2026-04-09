@@ -9,7 +9,6 @@ interface Trip {
   pickupLocation: string;
   dropLocation: string;
   wasteType: string;
-  fare: number;
   date: string;
   time: string;
   rating: number;
@@ -29,7 +28,6 @@ export default function TripsPage() {
       pickupLocation: 'Osu Oxford Street, Accra',
       dropLocation: 'Kpone Landfill Site',
       wasteType: 'General Waste',
-      fare: 25.00,
       date: '2024-01-15',
       time: '09:30 AM',
       rating: 5,
@@ -41,7 +39,6 @@ export default function TripsPage() {
       pickupLocation: 'East Legon, Accra',
       dropLocation: 'Tema Waste Transfer Station',
       wasteType: 'Recyclables',
-      fare: 32.50,
       date: '2024-01-15',
       time: '11:45 AM',
       rating: 5,
@@ -53,7 +50,6 @@ export default function TripsPage() {
       pickupLocation: 'Labone, Accra',
       dropLocation: 'Accra Compost Plant',
       wasteType: 'Organic Waste',
-      fare: 28.00,
       date: '2024-01-15',
       time: '02:15 PM',
       rating: 4,
@@ -65,7 +61,6 @@ export default function TripsPage() {
       pickupLocation: 'Airport Residential, Accra',
       dropLocation: 'Kpone Landfill Site',
       wasteType: 'General Waste',
-      fare: 30.00,
       date: '2024-01-14',
       time: '10:20 AM',
       rating: 5,
@@ -77,7 +72,6 @@ export default function TripsPage() {
       pickupLocation: 'Cantonments, Accra',
       dropLocation: 'Tema Waste Transfer Station',
       wasteType: 'Mixed Waste',
-      fare: 35.00,
       date: '2024-01-14',
       time: '03:45 PM',
       rating: 4,
@@ -89,7 +83,6 @@ export default function TripsPage() {
       pickupLocation: 'Roman Ridge, Accra',
       dropLocation: 'Accra Compost Plant',
       wasteType: 'Organic Waste',
-      fare: 27.50,
       date: '2024-01-13',
       time: '08:30 AM',
       rating: 5,
@@ -101,7 +94,6 @@ export default function TripsPage() {
       pickupLocation: 'Dzorwulu, Accra',
       dropLocation: 'Kpone Landfill Site',
       wasteType: 'General Waste',
-      fare: 26.00,
       date: '2024-01-12',
       time: '01:00 PM',
       rating: 5,
@@ -113,7 +105,6 @@ export default function TripsPage() {
       pickupLocation: 'Adabraka, Accra',
       dropLocation: 'Tema Waste Transfer Station',
       wasteType: 'Recyclables',
-      fare: 22.00,
       date: '2024-01-11',
       time: '11:15 AM',
       rating: 4,
@@ -154,9 +145,6 @@ export default function TripsPage() {
 
   const filteredTrips = filterTrips();
 
-  const getTotalEarnings = () => {
-    return filteredTrips.reduce((sum, trip) => sum + trip.fare, 0);
-  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -225,13 +213,9 @@ export default function TripsPage() {
 
         {/* Summary Card */}
         <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl shadow-lg p-5 mb-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-emerald-100 mb-1">Total Earnings</p>
-              <p className="text-3xl font-bold">GH₵ {getTotalEarnings().toFixed(2)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-emerald-100 mb-1">Trips</p>
+          <div className="flex items-center justify-center gap-4">
+            <div className="text-center">
+              <p className="text-sm text-emerald-100 mb-1">Total Trips</p>
               <p className="text-3xl font-bold">{filteredTrips.length}</p>
             </div>
           </div>
@@ -265,8 +249,7 @@ export default function TripsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-emerald-600">GH₵ {trip.fare.toFixed(2)}</p>
-                      <div className="flex items-center gap-1 justify-end mt-1">
+                      <div className="flex items-center gap-1 justify-end">
                         {[...Array(5)].map((_, i) => (
                           <i
                             key={i}

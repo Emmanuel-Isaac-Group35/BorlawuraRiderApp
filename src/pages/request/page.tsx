@@ -12,7 +12,6 @@ export default function RequestPage() {
     customerName: 'Kwame Mensah',
     pickupLocation: 'Osu Oxford Street, Accra',
     wasteType: 'General Waste',
-    estimatedFare: 25.00,
     distance: 2.3,
     coordinates: { lat: 5.5557, lng: -0.1969 }
   };
@@ -130,17 +129,6 @@ export default function RequestPage() {
           </div>
         </div>
 
-        {/* Fare Card */}
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl shadow-lg p-5 mb-4 text-white">
-          <p className="text-sm text-emerald-100 mb-2">Estimated Fare</p>
-          <div className="flex items-end justify-between">
-            <p className="text-4xl font-bold">GH₵ {request.estimatedFare.toFixed(2)}</p>
-            <div className="text-right">
-              <p className="text-xs text-emerald-100">Distance</p>
-              <p className="text-lg font-semibold">{request.distance} km</p>
-            </div>
-          </div>
-        </div>
 
         {/* Map Preview */}
         <div className="bg-white rounded-2xl shadow-md overflow-hidden mb-4">

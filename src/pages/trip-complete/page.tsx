@@ -11,19 +11,12 @@ export default function TripCompletePage() {
     wasteType: 'General Waste',
     distance: 5.8,
     duration: '28 mins',
-    baseFare: 20.00,
-    distanceFee: 5.00,
-    total: 25.00,
     date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
     time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   };
 
   const handleDone = () => {
     navigate('/');
-  };
-
-  const handleViewEarnings = () => {
-    navigate('/earnings');
   };
 
   return (
@@ -34,27 +27,7 @@ export default function TripCompletePage() {
           <i className="ri-checkbox-circle-fill text-white text-6xl"></i>
         </div>
         <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">Trip Completed!</h1>
-        <p className="text-sm text-gray-600 text-center">Great job! Your earnings have been added.</p>
-      </div>
-
-      {/* Earnings Card */}
-      <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl shadow-lg p-6 mb-4 text-white w-full max-w-md">
-        <p className="text-sm text-emerald-100 mb-2 text-center">You Earned</p>
-        <p className="text-5xl font-bold text-center mb-4">GH₵ {tripData.total.toFixed(2)}</p>
-        <div className="bg-white/20 rounded-xl p-3 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-emerald-100">Base Fare</span>
-            <span className="font-semibold">GH₵ {tripData.baseFare.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-emerald-100">Distance Fee ({tripData.distance} km)</span>
-            <span className="font-semibold">GH₵ {tripData.distanceFee.toFixed(2)}</span>
-          </div>
-          <div className="border-t border-white/20 pt-2 flex justify-between font-bold">
-            <span>Total</span>
-            <span>GH₵ {tripData.total.toFixed(2)}</span>
-          </div>
-        </div>
+        <p className="text-sm text-gray-600 text-center">Great job! The pickup has been recorded successfully.</p>
       </div>
 
       {/* Trip Summary */}
@@ -121,13 +94,6 @@ export default function TripCompletePage() {
       {/* Action Buttons */}
       <div className="w-full max-w-md space-y-3">
         <button
-          onClick={handleViewEarnings}
-          className="w-full bg-white border-2 border-emerald-600 text-emerald-600 py-4 rounded-xl font-bold text-base shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2"
-        >
-          <i className="ri-wallet-3-line text-xl"></i>
-          View Earnings
-        </button>
-        <button
           onClick={handleDone}
           className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
         >
@@ -144,7 +110,7 @@ export default function TripCompletePage() {
         <div>
           <p className="font-semibold text-gray-800 text-sm mb-1">Keep it up!</p>
           <p className="text-xs text-gray-600">
-            You're doing great! Complete 2 more trips today to earn a bonus.
+            You're doing great! Keep completing trips to maintain your high rating.
           </p>
         </div>
       </div>

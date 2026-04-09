@@ -95,8 +95,11 @@ export default function HomePage() {
           table: 'orders',
         },
         async (payload) => {
-          // Only notify if trip is pending and rider is online
-          if (payload.new.status === 'pending' && isOnline) {
+          // Check if the order was specifically requested for another rider
+          const isRequestedForOtherRider = payload.new.rider_id && payload.new.rider_id !== user.id;
+
+          // Only notify if trip is pending, rider is online, and it's either a broadcast or specifically for this rider
+          if (payload.new.status === 'pending' && isOnline && !isRequestedForOtherRider) {
             console.log('New real-time trip request received:', payload.new);
             
             // Broad name resolution logic for every possible field variant

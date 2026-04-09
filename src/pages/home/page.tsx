@@ -9,8 +9,6 @@ export default function HomePage() {
   const [showNotification, setShowNotification] = useState(false);
 
   const stats = {
-    todayEarnings: 87.50,
-    weeklyEarnings: 285.00,
     todayTrips: 3,
     rating: 4.9
   };
@@ -92,27 +90,17 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Earnings Summary */}
+        {/* Today's Summary */}
         <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl shadow-lg p-5 mb-4 text-white">
-          <p className="text-sm text-emerald-100 mb-3">Today's Earnings</p>
-          <div className="flex items-end justify-between mb-4">
-            <p className="text-4xl font-bold">GH₵ {stats.todayEarnings.toFixed(2)}</p>
-            <div className="text-right">
-              <p className="text-xs text-emerald-100">Trips</p>
-              <p className="text-2xl font-bold">{stats.todayTrips}</p>
-            </div>
-          </div>
-          <div className="bg-white/20 rounded-xl p-3 flex items-center justify-between">
+          <p className="text-sm text-emerald-100 mb-3">Today's Summary</p>
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-emerald-100">This Week</p>
-              <p className="text-lg font-bold">GH₵ {stats.weeklyEarnings.toFixed(2)}</p>
+              <p className="text-xs text-emerald-100 mb-1">Trips Completed</p>
+              <p className="text-4xl font-bold">{stats.todayTrips}</p>
             </div>
-            <button
-              onClick={() => navigate('/earnings')}
-              className="bg-white text-emerald-600 px-4 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-transform"
-            >
-              View Details
-            </button>
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+              <i className="ri-route-line text-3xl text-white"></i>
+            </div>
           </div>
         </div>
 
@@ -186,7 +174,7 @@ export default function HomePage() {
           <div>
             <p className="font-semibold text-gray-800 text-sm mb-1">Pro Tip</p>
             <p className="text-xs text-gray-600">
-              Peak hours are 7-9 AM and 5-7 PM. Go online during these times to earn bonus payments!
+              Peak hours are 7-9 AM and 5-7 PM. Go online during these times to get more pickup requests!
             </p>
           </div>
         </div>

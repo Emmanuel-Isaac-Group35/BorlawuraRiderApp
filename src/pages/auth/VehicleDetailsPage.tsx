@@ -53,45 +53,74 @@ export default function VehicleDetailsPage() {
             });
 
             if (authError) {
-                // If error is related to existing user or rate limit, try to Sign In instead
-                console.log("Signup failed, raw error:", JSON.stringify(authError, null, 2));
-                console.log("Attempting signin as recovery... status:", authError.status);
+                console.log("Signup error:", JSON.stringify(authError, null, 2));
 
-                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-                    email: trimmedEmail,
-                    password: trimmedPassword,
-                });
+                // status 422 = user already exists → try signing in with same credentials
+                // status 400 = user exists (older Supabase versions)
+                // status 500 = server-side error (often a broken DB trigger)
+                if (authError.status === 422 || authError.status === 400 ||
+                    authError.message?.toLowerCase().includes('already registered') ||
+                    authError.message?.toLowerCase().includes('user already exists')) {
 
-                if (signInError) {
+                    console.log("User may already exist, attempting sign-in...");
+                    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                        email: trimmedEmail,
+                        password: trimmedPassword,
+                    });
+
+                    if (signInError) {
+                        console.log("Sign-in recovery failed:", JSON.stringify(signInError, null, 2));
+                        throw new Error("An account with this email already exists but the password is incorrect. Please log in instead.");
+                    }
+                    userId = signInData.session?.user.id;
+
+                } else if (authError.status === 500) {
+                    // 500 = Supabase server-side failure, often a broken trigger on auth.users.
+                    // The user account may or may not have been created on the auth side.
+                    // Attempt a sign-in — if the account was created before the trigger failed, this succeeds.
+                    console.log("500 error from Supabase, attempting sign-in as recovery...");
+                    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                        email: trimmedEmail,
+                        password: trimmedPassword,
+                    });
+
+                    if (signInError) {
+                        // Account truly couldn't be created. Likely a DB trigger issue.
+                        throw new Error(
+                            "Registration failed due to a server configuration issue. " +
+                            "Please contact support or try again later. (Code: AUTH_500)"
+                        );
+                    }
+                    userId = signInData.session?.user.id;
+
+                } else {
                     throw authError;
                 }
-
-                userId = signInData.session?.user.id;
             } else {
+                // signUp succeeded — user may need to confirm email
+                // If email confirmation is on, user.id is available but session may be null
                 userId = authData.user?.id;
             }
 
             if (!userId) {
-                throw new Error("Failed to authenticate. Please try using a different email.");
+                throw new Error("Could not retrieve user ID after authentication. Please try again.");
             }
 
-            // 2. Upsert Profile (now that we have a valid userId from either signup or signin)
+            // 2. Upsert Profile
             const finalProfile = {
                 id: userId,
-                email: registrationData.email,
+                email: trimmedEmail,
                 phone: registrationData.phone,
-                phone_number: registrationData.phone, // required by database schema
+                phone_number: registrationData.phone,
                 first_name: registrationData.first_name,
                 last_name: registrationData.last_name,
-                full_name: `${registrationData.first_name || ''} ${registrationData.last_name || ''}`.trim(), // required by database schema
+                full_name: `${registrationData.first_name || ''} ${registrationData.last_name || ''}`.trim(),
                 language: registrationData.language,
                 rider_license_number: registrationData.rider_license_number,
-
                 avatar_url: registrationData.avatar_url,
                 license_photo_url: registrationData.license_photo_url,
                 ghana_card_photo_url: registrationData.ghana_card_photo_url,
                 vehicle_photo_url: registrationData.vehicle_photo_url,
-
                 updated_at: new Date().toISOString(),
             };
 
@@ -99,21 +128,24 @@ export default function VehicleDetailsPage() {
                 .from('riders')
                 .upsert(finalProfile);
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                console.log("Profile upsert error:", JSON.stringify(profileError, null, 2));
+                throw profileError;
+            }
 
             Alert.alert(
                 "Application Submitted",
-                "Your registration has been submitted successfully.",
+                "Your registration has been submitted successfully. You can now sign in.",
                 [
                     { text: "OK", onPress: () => navigation.navigate('Onboarding' as never) }
                 ]
             );
         } catch (error: any) {
-            // Friendly message for rate limits
+            console.error("Registration error:", error);
             if (error.message?.toLowerCase().includes('rate limit')) {
-                Alert.alert("Too Many Attempts", "Please wait a moment or try logging in if you already have an account.");
+                Alert.alert("Too Many Attempts", "Please wait a moment before trying again.");
             } else {
-                Alert.alert("Submission Failed", error.message);
+                Alert.alert("Submission Failed", error.message || "An unexpected error occurred. Please try again.");
             }
         } finally {
             setLoading(false);

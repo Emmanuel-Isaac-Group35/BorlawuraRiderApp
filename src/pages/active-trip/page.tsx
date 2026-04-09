@@ -15,7 +15,6 @@ export default function ActiveTripPage() {
     customerName: 'Kwame Mensah',
     pickupLocation: 'Osu Oxford Street, Accra',
     wasteType: 'General Waste',
-    estimatedFare: 25.00,
     pickupCoordinates: { lat: 5.5557, lng: -0.1969 }
   };
 
@@ -198,21 +197,16 @@ export default function ActiveTripPage() {
           </div>
         </div>
 
-        {/* Waste Type & Fare */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-white rounded-xl shadow-md p-4">
-            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center mb-3">
+        {/* Waste Type */}
+        <div className="bg-white rounded-xl shadow-md p-4 mb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
               <i className="ri-delete-bin-line text-xl text-amber-600"></i>
             </div>
-            <p className="text-xs text-gray-500 mb-1">Waste Type</p>
-            <p className="font-semibold text-gray-800 text-sm">{tripData.wasteType}</p>
-          </div>
-          <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl shadow-md p-4 text-white">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mb-3">
-              <i className="ri-money-dollar-circle-line text-xl"></i>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Waste Type</p>
+              <p className="font-semibold text-gray-800">{tripData.wasteType}</p>
             </div>
-            <p className="text-xs text-emerald-100 mb-1">Fare</p>
-            <p className="font-bold text-lg">GH₵ {tripData.estimatedFare.toFixed(2)}</p>
           </div>
         </div>
 
