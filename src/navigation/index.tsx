@@ -42,8 +42,6 @@ function MainTabs() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Trips') {
             iconName = focused ? 'location' : 'location-outline';
-          } else if (route.name === 'Tracking') {
-            iconName = focused ? 'map' : 'map-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else {
@@ -79,11 +77,7 @@ function MainTabs() {
         component={TripsPage}
         options={{ title: 'Trips' }}
       />
-      <Tab.Screen
-        name="Tracking"
-        component={TrackingPage}
-        options={{ title: 'Tracking' }}
-      />
+
       <Tab.Screen
         name="Profile"
         component={ProfilePage}
@@ -133,6 +127,7 @@ export function AppNavigator() {
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Request" component={RequestPage} />
           <Stack.Screen name="ActiveTrip" component={ActiveTripPage} />
+          <Stack.Screen name="Tracking" component={TrackingPage} />
           <Stack.Screen name="TripComplete" component={TripCompletePage} />
           <Stack.Screen name="Support" component={SupportPage} />
           <Stack.Screen name="AuditLogs" component={AuditLogsPage} />

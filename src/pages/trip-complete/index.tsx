@@ -11,7 +11,6 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 
 import { supabase } from '../../lib/supabase';
@@ -19,7 +18,6 @@ import { useState, useEffect } from 'react';
 
 type RootStackParamList = {
   MainTabs: undefined;
-  Earnings: undefined;
   TripComplete: { trip?: any };
 };
 
@@ -50,10 +48,6 @@ export default function TripCompletePage() {
     fetchCustomerDetails();
   }, [dbTrip?.user_id, dbTrip?.customer_name]);
 
-  const rawTotal = Number(dbTrip?.amount || dbTrip?.fare || 0);
-  const baseFareValue = rawTotal > 0 ? rawTotal * 0.8 : 20.00;
-  const distanceFeeValue = rawTotal > 0 ? rawTotal * 0.2 : 5.00;
-
   const tripData = {
     customerName: customerName,
     pickupLocation: dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location',
@@ -61,9 +55,6 @@ export default function TripCompletePage() {
     wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
     distance: Number(dbTrip?.distance_value || dbTrip?.distance || 0),
     duration: 'N/A mins',
-    baseFare: baseFareValue,
-    distanceFee: distanceFeeValue,
-    total: rawTotal,
     date: new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -80,10 +71,6 @@ export default function TripCompletePage() {
     navigation.navigate('MainTabs');
   };
 
-  const handleViewEarnings = () => {
-    navigation.navigate('Earnings');
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -98,42 +85,9 @@ export default function TripCompletePage() {
           </View>
           <Text style={styles.successTitle}>Trip Completed!</Text>
           <Text style={styles.successSubtitle}>
-            Great job! Your earnings have been added.
+            Thanks for completing this pickup.
           </Text>
         </View>
-
-        {/* Earnings Card */}
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          style={styles.earningsCard}
-        >
-          <Text style={styles.earningsLabel}>You Earned</Text>
-          <Text style={styles.earningsAmount}>
-            GH₵ {tripData.total.toFixed(2)}
-          </Text>
-          <View style={styles.earningsBreakdown}>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Base Fare</Text>
-              <Text style={styles.breakdownValue}>
-                GH₵ {tripData.baseFare.toFixed(2)}
-              </Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>
-                Distance Fee ({tripData.distance} km)
-              </Text>
-              <Text style={styles.breakdownValue}>
-                GH₵ {tripData.distanceFee.toFixed(2)}
-              </Text>
-            </View>
-            <View style={[styles.breakdownRow, styles.breakdownTotal]}>
-              <Text style={styles.breakdownTotalLabel}>Total</Text>
-              <Text style={styles.breakdownTotalValue}>
-                GH₵ {tripData.total.toFixed(2)}
-              </Text>
-            </View>
-          </View>
-        </LinearGradient>
 
         {/* Trip Summary */}
         <View style={styles.card}>
@@ -199,14 +153,6 @@ export default function TripCompletePage() {
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
           <TouchableOpacity
-            onPress={handleViewEarnings}
-            style={styles.secondaryButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="wallet-outline" size={20} color={colors.primary} />
-            <Text style={styles.secondaryButtonText}>View Earnings</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             onPress={handleDone}
             style={styles.primaryButton}
             activeOpacity={0.8}
@@ -268,67 +214,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.secondary,
     textAlign: 'center',
-  },
-  earningsCard: {
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 16,
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  earningsLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  earningsAmount: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  earningsBreakdown: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  breakdownLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  breakdownValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  breakdownTotal: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-    paddingTop: 8,
-    marginTop: 4,
-  },
-  breakdownTotalLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  breakdownTotalValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
   },
   card: {
     backgroundColor: '#ffffff',
@@ -430,27 +315,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  secondaryButton: {
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  secondaryButtonText: {
-    color: colors.primary,
     fontSize: 16,
     fontWeight: 'bold',
   },

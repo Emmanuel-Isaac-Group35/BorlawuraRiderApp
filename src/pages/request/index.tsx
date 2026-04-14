@@ -8,6 +8,7 @@ import {
   StatusBar,
   Linking,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -35,7 +36,7 @@ export default function RequestPage() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RequestPageProps>();
   const trip = route.params?.trip;
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [timeLeft, setTimeLeft] = useState(25);
   const [isAccepting, setIsAccepting] = useState(false);
@@ -159,7 +160,6 @@ export default function RequestPage() {
     customerName: customerName,
     pickupLocation: pickupAddress,
     wasteType: fullTripData?.waste_type || fullTripData?.waste_size || 'General Waste',
-    estimatedFare: Number(fullTripData?.amount || fullTripData?.fare) || 0,
     distance: tripDistance,
     coordinates: tripCoords
   };
@@ -186,22 +186,24 @@ export default function RequestPage() {
           .from('orders')
           .update({ 
              status: 'active',
-             sub_status: 'assigned',
+             sub_status: 'accepted',
              rider_id: user.id,
              accepted_at: new Date().toISOString()
           })
           .eq('id', trip.id);
         
-        if (error) throw error;
+        if (error) {
+           console.error("Supabase Order Update Error:", error);
+           throw error;
+        }
       }
 
       setIsAccepting(false);
       navigation.replace('ActiveTrip', { trip });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error accepting trip:', error);
       setIsAccepting(false);
-      // Fallback
-      navigation.replace('ActiveTrip', { trip });
+      Alert.alert('Acceptance Failed', error.message || 'Could not accept this order. Please try again or check your connection.');
     }
   };
 
@@ -314,23 +316,6 @@ export default function RequestPage() {
             </View>
           </View>
         </View>
-
-        {/* Fare Card */}
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          style={styles.fareCard}
-        >
-          <Text style={styles.fareLabel}>Estimated Fare</Text>
-          <View style={styles.fareRow}>
-            <Text style={styles.fareAmount}>
-              GH₵ {request.estimatedFare.toFixed(2)}
-            </Text>
-            <View style={styles.fareRight}>
-              <Text style={styles.fareSubLabel}>Distance</Text>
-              <Text style={styles.fareDistance}>{request.distance} km</Text>
-            </View>
-          </View>
-        </LinearGradient>
 
         {/* Map Preview */}
         <View style={styles.card}>
@@ -553,44 +538,6 @@ const styles = StyleSheet.create({
   distance: {
     fontSize: 12,
     color: colors.primary,
-  },
-  fareCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  fareLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
-  },
-  fareRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  fareAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  fareRight: {
-    alignItems: 'flex-end',
-  },
-  fareSubLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 4,
-  },
-  fareDistance: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
   },
   mapContainer: {
     height: 192,

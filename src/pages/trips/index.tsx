@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 import { supabase } from '../../lib/supabase';
 import { fetchTrips } from '../../lib/api';
@@ -46,7 +45,6 @@ export default function TripsPage() {
   const navigation = useNavigation<NavigationProp>();
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
 
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +61,7 @@ export default function TripsPage() {
     if (!user?.id) return;
     try {
       const data = await fetchTrips(user.id);
-      // @ts-ignore - mismatch in status string literal type vs generic string
+      // @ts-ignore
       setAllTrips(data);
     } catch (error) {
       console.error('Error fetching trips:', error);
@@ -72,38 +70,24 @@ export default function TripsPage() {
     }
   };
 
-  // Real-time listener for trip updates
   React.useEffect(() => {
     if (!user?.id) return;
-
     const tripsChannel = supabase
       .channel('trips-history-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen for ALL events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'orders',
-          filter: `rider_id=eq.${user.id}`,
-        },
-        () => {
-          console.log('Real-time trip update detected, refreshing history...');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `rider_id=eq.${user.id}` }, () => {
           loadTrips();
-        }
-      )
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(tripsChannel);
-    };
+    return () => { supabase.removeChannel(tripsChannel); };
   }, [user?.id]);
-
 
   const filterTrips = () => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    let filtered = allTrips;
+    // Ensure we only show trips with 'completed' status
+    let filtered = allTrips.filter(trip => trip.status === 'completed');
 
     if (activeFilter === 'today') {
       filtered = filtered.filter(trip => trip.date === todayStr);
@@ -124,15 +108,10 @@ export default function TripsPage() {
         trip.wasteType.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-
     return filtered;
   };
 
   const filteredTrips = filterTrips();
-
-  const getTotalEarnings = () => {
-    return filteredTrips.reduce((sum, trip) => sum + trip.fare, 0);
-  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -140,79 +119,47 @@ export default function TripsPage() {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (dateStr === today.toISOString().split('T')[0]) {
-      return 'Today';
-    } else if (dateStr === yesterday.toISOString().split('T')[0]) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-  };
-
-  const toggleTripExpansion = (tripId: string) => {
-    setExpandedTrip(expandedTrip === tripId ? null : tripId);
+    if (dateStr === today.toISOString().split('T')[0]) return 'Today';
+    if (dateStr === yesterday.toISOString().split('T')[0]) return 'Yesterday';
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   const renderTripItem = ({ item }: { item: Trip }) => {
-    const isExpanded = expandedTrip === item.id;
-
     return (
-      <View style={styles.tripCard}>
-        <TouchableOpacity
-          onPress={() => toggleTripExpansion(item.id)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.tripHeader}>
-            <View style={styles.tripHeaderLeft}>
-              <View style={styles.customerIcon}>
-                <Ionicons name="person-outline" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.tripInfo}>
-                <Text style={styles.customerName}>{item.customerName}</Text>
-                <Text style={styles.tripDate}>
-                  {formatDate(item.date)} • {item.time}
-                </Text>
-              </View>
+      <View style={styles.premiumCard}>
+        <View style={styles.cardHeader}>
+          <View style={styles.headerTitleRow}>
+             <View style={styles.avatar}>
+               <Text style={styles.avatarText}>{item.customerName.charAt(0).toUpperCase()}</Text>
+             </View>
+             <View>
+               <Text style={styles.customerName}>{item.customerName}</Text>
+               <Text style={styles.tripDate}>{formatDate(item.date)}, {item.time}</Text>
+             </View>
+          </View>
+          <View style={styles.badgeWrapper}>
+            <Text style={styles.wasteBadgeText}>{item.wasteType}</Text>
+          </View>
+        </View>
+
+        <View style={styles.routeContainer}>
+          <View style={styles.routeLine}>
+            <View style={styles.routeDotTop} />
+            <View style={styles.routeConnector} />
+            <View style={styles.routeDotBottom} />
+          </View>
+          
+          <View style={styles.routeDetails}>
+            <View style={styles.locationBlock}>
+              <Text style={styles.locationLabel}>Picked up from</Text>
+              <Text style={styles.locationValue} numberOfLines={1}>{item.pickupLocation}</Text>
             </View>
-            <View style={styles.tripHeaderRight}>
-              <Text style={styles.tripFare}>GH₵ {item.fare.toFixed(2)}</Text>
-              <View style={styles.ratingContainer}>
-                {[...Array(5)].map((_, i) => (
-                  <Ionicons
-                    key={i}
-                    name={i < item.rating ? 'star' : 'star-outline'}
-                    size={12}
-                    color={i < item.rating ? '#facc15' : colors.gray[300]}
-                  />
-                ))}
-              </View>
+            <View style={styles.locationBlockBottom}>
+              <Text style={styles.locationLabel}>Dropped off at</Text>
+              <Text style={styles.locationValue} numberOfLines={1}>{item.dropLocation}</Text>
             </View>
           </View>
-
-          <View style={styles.pickupLocation}>
-            <Ionicons name="location-outline" size={16} color={colors.primary} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {item.pickupLocation}
-            </Text>
-          </View>
-
-          {isExpanded && (
-            <View style={styles.expandedContent}>
-              <View style={styles.dropLocation}>
-                <Ionicons name="business-outline" size={16} color={colors.blue[600]} />
-                <View style={styles.dropLocationText}>
-                  <Text style={styles.dropLocationLabel}>Drop Location</Text>
-                  <Text style={styles.dropLocationValue}>{item.dropLocation}</Text>
-                </View>
-              </View>
-              <View style={styles.wasteTypeRow}>
-                <Ionicons name="trash-outline" size={16} color={colors.amber[600]} />
-                <Text style={styles.wasteTypeLabel}>Waste Type: </Text>
-                <Text style={styles.wasteTypeValue}>{item.wasteType}</Text>
-              </View>
-            </View>
-          )}
-        </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -221,98 +168,62 @@ export default function TripsPage() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primary]}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Trip History</Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Home')}
-            style={styles.homeButton}
-          >
-            <Ionicons name="home-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      {/* Premium Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Trips History</Text>
+      </View>
+
+      {/* Summary Widget */}
+      <View style={styles.summaryContainer}>
+        <View style={styles.totalTripsWidget}>
+          <View>
+            <Text style={styles.summaryLabel}>Total Completed</Text>
+            <Text style={styles.summaryCount}>{filteredTrips.length}</Text>
+          </View>
+          <Ionicons name="checkmark-done-circle" size={48} color={colors.primary} style={{ opacity: 0.2 }} />
         </View>
 
-        {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="rgba(255, 255, 255, 0.7)" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color={colors.text.secondary} />
           <TextInput
-            placeholder="Search trips..."
-            placeholderTextColor="rgba(255, 255, 255, 0.7)"
+            placeholder="Search locations or customers..."
+            placeholderTextColor={colors.gray[400]}
             value={searchQuery}
             onChangeText={setSearchQuery}
             style={styles.searchInput}
           />
         </View>
-      </LinearGradient>
+      </View>
 
-      {/* Main Content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Filter Tabs */}
-        <View style={styles.filterContainer}>
-          {filters.map((filter) => (
+      <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 80 }}>
+        {/* Pills */}
+        <View style={styles.filterPills}>
+          {filters.map((f) => (
             <TouchableOpacity
-              key={filter}
-              onPress={() => setActiveFilter(filter)}
-              style={[
-                styles.filterButton,
-                activeFilter === filter && styles.filterButtonActive,
-              ]}
-              activeOpacity={0.7}
+              key={f}
+              onPress={() => setActiveFilter(f)}
+              style={[styles.pillBtn, activeFilter === f && styles.pillBtnActive]}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  activeFilter === filter && styles.filterButtonTextActive,
-                ]}
-              >
-                {filter === 'all' ? 'All' : filter === 'today' ? 'Today' : filter === 'week' ? 'This Week' : 'This Month'}
+              <Text style={[styles.pillText, activeFilter === f && styles.pillTextActive]}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Summary Card */}
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          style={styles.summaryCard}
-        >
-          <View>
-            <Text style={styles.summaryLabel}>Total Earnings</Text>
-            <Text style={styles.summaryAmount}>GH₵ {getTotalEarnings().toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryRight}>
-            <Text style={styles.summaryLabel}>Trips</Text>
-            <Text style={styles.summaryAmount}>{filteredTrips.length}</Text>
-          </View>
-        </LinearGradient>
-
-        {/* Trips List */}
         {filteredTrips.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="file-tray-outline" size={48} color={colors.gray[400]} />
-            </View>
-            <Text style={styles.emptyTitle}>No trips found</Text>
-            <Text style={styles.emptyText}>
-              Try adjusting your filters or search query
-            </Text>
+          <View style={styles.emptyState}>
+             <Ionicons name="book-outline" size={64} color={colors.gray[300]} />
+             <Text style={styles.emptyStateLabel}>No trips found</Text>
           </View>
         ) : (
           <FlatList
+            scrollEnabled={false}
             data={filteredTrips}
             renderItem={renderTripItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            keyExtractor={(i) => i.id}
           />
         )}
       </ScrollView>
@@ -323,257 +234,212 @@ export default function TripsPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: '#FAFAFA',
   },
   header: {
-    paddingTop: 10,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: '#ffffff',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontSize: 28,
+    fontFamily: 'sans-serif-medium',
+    fontWeight: '800',
+    color: '#111827',
   },
-  homeButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
+  summaryContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: '#ffffff',
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: 16,
+  },
+  totalTripsWidget: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primaryLighter,
+    padding: 24,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: colors.primaryDark,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  summaryCount: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: colors.primary,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  searchIcon: {
-    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    color: '#ffffff',
-    fontSize: 14,
+    marginLeft: 12,
+    fontSize: 15,
+    color: '#1F2937',
   },
-  scrollView: {
+  scrollArea: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 16,
-    paddingBottom: 80,
-  },
-  filterContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
+  filterPills: {
     flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    paddingHorizontal: 24,
+    marginBottom: 16,
+    gap: 8,
   },
-  filterButton: {
-    flex: 1,
+  pillBtn: {
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
   },
-  filterButtonActive: {
+  pillBtnActive: {
     backgroundColor: colors.primary,
   },
-  filterButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.text.secondary,
+  pillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
   },
-  filterButtonTextActive: {
+  pillTextActive: {
     color: '#ffffff',
   },
-  summaryCard: {
-    borderRadius: 16,
-    padding: 20,
+  premiumCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 24,
     marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    borderRadius: 24,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 4,
-  },
-  summaryAmount: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  summaryRight: {
-    alignItems: 'flex-end',
-  },
-  emptyContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
     elevation: 2,
   },
-  emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.gray[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  tripCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tripHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  tripHeaderLeft: {
+  headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  customerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.amber[100],
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  tripInfo: {
-    flex: 1,
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.amber[600],
   },
   customerName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   tripDate: {
-    fontSize: 12,
-    color: colors.text.secondary,
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
-  tripHeaderRight: {
-    alignItems: 'flex-end',
+  badgeWrapper: {
+    backgroundColor: colors.gray[100],
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  tripFare: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 4,
+  wasteBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4B5563',
   },
-  ratingContainer: {
+  routeContainer: {
     flexDirection: 'row',
-    gap: 2,
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 16,
   },
-  pickupLocation: {
-    flexDirection: 'row',
+  routeLine: {
     alignItems: 'center',
-    gap: 8,
+    marginRight: 16,
   },
-  locationText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    flex: 1,
-  },
-  expandedContent: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[100],
-    gap: 8,
-  },
-  dropLocation: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  dropLocationText: {
-    flex: 1,
-  },
-  dropLocationLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  dropLocationValue: {
-    fontSize: 12,
-    color: colors.text.primary,
-  },
-  wasteTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  wasteTypeLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  wasteTypeValue: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  separator: {
+  routeDotTop: {
+    width: 12,
     height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.blue[500],
+    borderWidth: 3,
+    borderColor: colors.blue[100],
   },
+  routeConnector: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+  routeDotBottom: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+    borderWidth: 3,
+    borderColor: colors.primaryLight,
+  },
+  routeDetails: {
+    flex: 1,
+  },
+  locationBlock: {
+    marginBottom: 16,
+  },
+  locationBlockBottom: {},
+  locationLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  locationValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 64,
+  },
+  emptyStateLabel: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.gray[400],
+  }
 });
-
-
-
-
-
-
-

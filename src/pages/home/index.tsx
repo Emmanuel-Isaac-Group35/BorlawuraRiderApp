@@ -1,34 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  StatusBar,
-  Animated,
+  AppState,
+  Alert,
+  ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
-import { Modal } from '../../components/common/Modal';
 import { Toast } from '../../components/common/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchStats, toggleOnlineStatus } from '../../lib/api';
-import { useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+
+const { width, height } = Dimensions.get('window');
 
 type RootStackParamList = {
   MainTabs: undefined;
   Request: { trip?: any };
   Profile: undefined;
-  Tracking: undefined;
+  Tracking: { trip?: any };
   Trips: undefined;
   Support: undefined;
 };
@@ -47,9 +47,84 @@ export default function HomePage() {
     acceptanceRate: 100,
   });
   const [isOnline, setIsOnline] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
+  
+  const mapRef = useRef<MapView>(null);
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [activeRiders, setActiveRiders] = useState<{id: string, lat: number, lng: number}[]>([]);
 
+  // Update rider's location in Supabase when moving and online
+  useEffect(() => {
+    if (user && isOnline && location) {
+      supabase
+        .from('riders')
+        .update({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        })
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (error) console.error('Error updating location:', error);
+        });
+    }
+  }, [location, isOnline, user]);
+
+  // Fetch real-time active riders globally
+  useEffect(() => {
+    if (!isOnline || !user) {
+      setActiveRiders([]);
+      return;
+    }
+
+    const fetchOtherRiders = async () => {
+      const { data, error } = await supabase
+        .from('riders')
+        .select('id, latitude, longitude')
+        .eq('is_online', true)
+        .neq('id', user.id)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+
+      if (data && !error) {
+        setActiveRiders(data.map(r => ({ id: r.id, lat: r.latitude!, lng: r.longitude! })));
+      }
+    };
+
+    fetchOtherRiders();
+    
+    // Subscribe to realtime updates for other riders
+    const channel = supabase
+      .channel('active-riders')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'riders', filter: 'is_online=eq.true' },
+        (payload) => {
+          if (payload.new.id !== user.id && payload.new.latitude && payload.new.longitude) {
+            setActiveRiders(prev => {
+              const exists = prev.find(r => r.id === payload.new.id);
+              if (exists) {
+                return prev.map(r => r.id === payload.new.id ? { id: r.id, lat: payload.new.latitude, lng: payload.new.longitude } : r);
+              }
+              return [...prev, { id: payload.new.id, lat: payload.new.latitude, lng: payload.new.longitude }];
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'riders', filter: 'is_online=eq.false' },
+        (payload) => {
+          setActiveRiders(prev => prev.filter(r => r.id !== payload.new.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOnline, user]);
+
+  // Focus effect to load stats
   useFocusEffect(
     useCallback(() => {
       if (user) {
@@ -60,13 +135,36 @@ export default function HomePage() {
 
   useEffect(() => {
     if (profile) {
-      // Remove automatic sync of is_online from profile 
-      // to ensure rider starts offline on sign in
       setStats(prev => ({ ...prev, rating: Number(profile.rating) }));
+      if (profile.is_online !== undefined) {
+        setIsOnline(profile.is_online);
+      }
     }
   }, [profile]);
 
-  // Ensure rider is offline when they first enter the home page (app start/sign in)
+  // AppState listener for auto online/offline
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (user) {
+        if (nextAppState === 'active') {
+          // Do nothing, let rider manually choose when to go online
+        } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+          try {
+            await toggleOnlineStatus(user.id, false);
+            setIsOnline(false);
+          } catch (error) {
+            console.error('Error auto-setting offline:', error);
+          }
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [user]);
+
+  // Initial offline setup
   useEffect(() => {
     const initializeOffline = async () => {
       if (user) {
@@ -80,8 +178,66 @@ export default function HomePage() {
     initializeOffline();
   }, [user]);
 
+  // Initialize and Watch Maps Location
+  useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+    
+    const startLocationTracking = async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          return;
+        }
 
-  // Listen for new trip requests in real-time
+        // Get initial location to render map quickly
+        let loc = await Location.getLastKnownPositionAsync({});
+        if (!loc) {
+          loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+        }
+        setLocation(loc);
+
+        // Subscribe to live location updates so the car marker actually moves
+        locationSubscription = await Location.watchPositionAsync(
+            {
+                accuracy: Location.Accuracy.High,
+                distanceInterval: 10,   // Update every 10 meters of movement
+                timeInterval: 5000,     // OR every 5 seconds
+            },
+            (newLocation) => {
+                setLocation(newLocation);
+            }
+        );
+
+      } catch (err) {
+        console.warn('Location fetching error:', err);
+        // Fallback to center of Accra if completely failed
+        setLocation(prev => prev || {
+          coords: {
+            latitude: 5.6037,
+            longitude: -0.1870,
+            altitude: 0,
+            accuracy: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            speed: 0,
+          },
+          timestamp: Date.now(),
+        });
+      }
+    };
+
+    startLocationTracking();
+
+    return () => {
+        if (locationSubscription) {
+            locationSubscription.remove();
+        }
+    };
+  }, []);
+
+  // Listen for realtime orders
   useEffect(() => {
     if (!user || !isOnline) return;
 
@@ -95,35 +251,26 @@ export default function HomePage() {
           table: 'orders',
         },
         async (payload) => {
-          // Check if the order was specifically requested for another rider
           const isRequestedForOtherRider = payload.new.rider_id && payload.new.rider_id !== user.id;
 
-          // Only notify if trip is pending, rider is online, and it's either a broadcast or specifically for this rider
           if (payload.new.status === 'pending' && isOnline && !isRequestedForOtherRider) {
-            console.log('New real-time trip request received:', payload.new);
-            
-            // Broad name resolution logic for every possible field variant
             let enrichedTrip = { ...payload.new };
             const tripId = payload.new.user_id || payload.new.userId || payload.new.customer_id;
             
-            // Try to find a name already in any possible payload field
             const existingName = payload.new.customer_name || payload.new.customerName || 
                              payload.new.user_name || payload.new.userName || 
                              payload.new.full_name || payload.new.fullName ||
                              payload.new.client_name || payload.new.clientName ||
-                             (payload.new.first_name ? `${payload.new.first_name} ${payload.new.last_name || ''}`.trim() : null);
+                             (payload.new.first_name ? (`${payload.new.first_name} ${payload.new.last_name || ''}`).trim() : null);
 
-            
             if (tripId && (!existingName || existingName === 'Customer')) {
               try {
-                // Try profiles first, handle 42P01 if missing
                 let { data: profile, error } = await supabase
                   .from('profiles')
                   .select('full_name, first_name, last_name, email')
                   .eq('id', tripId)
                   .maybeSingle();
                 
-                // Fallback to riders if no profile record OR profiles table doesn't exist (42P01)
                 if (!profile || error?.code === '42P01') {
                    const { data: riderProfile } = await supabase
                     .from('riders')
@@ -133,14 +280,12 @@ export default function HomePage() {
                    if (riderProfile) profile = { ...riderProfile, full_name: null } as any;
                 }
 
-
                 if (profile) {
                   const resolvedName = profile.full_name || 
-                                              (profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : 
+                                              (profile.first_name ? (`${profile.first_name} ${profile.last_name || ''}`).trim() : 
                                               (profile.email?.split('@')[0] || 'Customer'));
                   enrichedTrip.customer_name = resolvedName;
 
-                  // Persistence: Fix the database record automatically
                   await supabase
                     .from('orders')
                     .update({ customer_name: resolvedName })
@@ -153,10 +298,7 @@ export default function HomePage() {
                enrichedTrip.customer_name = existingName;
             }
 
-
             setShowNotification(true);
-            
-            // Navigate with the enriched data
             setTimeout(() => {
               navigation.navigate('Request', { trip: enrichedTrip });
             }, 1000);
@@ -164,8 +306,6 @@ export default function HomePage() {
         }
       )
       .subscribe();
-
-
 
     return () => {
       supabase.removeChannel(tripsSubscription);
@@ -184,7 +324,14 @@ export default function HomePage() {
 
   const handleToggleOnline = () => {
     if (!isOnline) {
-      setShowConfirmModal(true);
+      Alert.alert(
+        'Go Online',
+        'Are you ready to start receiving ride requests?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Yes, Go Online', onPress: () => updateOnlineStatus(true) }
+        ]
+      );
     } else {
       updateOnlineStatus(false);
     }
@@ -207,422 +354,407 @@ export default function HomePage() {
     }
   };
 
-  const confirmGoOnline = () => {
-    setShowConfirmModal(false);
-    updateOnlineStatus(true);
+  const recenterMap = () => {
+    if (location && mapRef.current) {
+        mapRef.current.animateToRegion({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+        }, 1000);
+    }
   };
 
+  if (!location) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primary]}
-        style={styles.header}
+    <View style={styles.container}>
+      {/* Background Map */}
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={{
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+        }}
+        showsUserLocation={false} 
+        showsMyLocationButton={false}
+        showsCompass={false}
+        customMapStyle={mapStyle}
       >
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.headerSubtitle}>Welcome back,</Text>
-            <Text style={styles.headerTitle}>{profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : 'Rider'}</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Profile')}
-            style={styles.profileButton}
+          {/* Custom car marker (The Rider) */}
+          <Marker
+             coordinate={{
+                 latitude: location.coords.latitude,
+                 longitude: location.coords.longitude,
+             }}
+             zIndex={10}
           >
-            <Ionicons name="person-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+             <View style={styles.markerContainer}>
+                 <View style={styles.markerHighlight} />
+                 <View style={styles.carIconWrapper}>
+                    <Ionicons name="car" size={24} color="#333" />
+                 </View>
+             </View>
+          </Marker>
 
-      {/* Main Content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Online/Offline Toggle */}
-        <View style={styles.card}>
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusLabel}>Work Status</Text>
-            <Text
-              style={[
-                styles.statusText,
-                { color: isOnline ? colors.primary : colors.text.light },
-              ]}
-            >
-              {isOnline ? "You're Online" : "You're Offline"}
-            </Text>
-          </View>
+          {/* Real-time active riders */}
+          {isOnline && activeRiders.map((rider) => (
+             <Marker
+                key={rider.id}
+                coordinate={{
+                    latitude: rider.lat,
+                    longitude: rider.lng,
+                }}
+                zIndex={1}
+             >
+                <View style={[styles.markerContainer, { opacity: 0.85 }]}>
+                    <View style={[styles.carIconWrapper, { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.gray[100] }]}>
+                        <Ionicons name="car" size={18} color={colors.primary} />
+                    </View>
+                </View>
+             </Marker>
+          ))}
+      </MapView>
 
-          <TouchableOpacity
-            onPress={handleToggleOnline}
+      {/* Foreground UI Components */}
+      <SafeAreaView style={styles.overlay} pointerEvents="box-none">
+        
+        {/* Top Action Toggle Button */}
+        <View style={[styles.actionToggleWrapper, { paddingTop: 16, paddingBottom: 0, transform: [] }]} pointerEvents="box-none">
+          <TouchableOpacity 
             style={[
-              styles.toggleButton,
-              {
-                backgroundColor: isOnline ? colors.gray[200] : colors.primary,
-              },
+              styles.goOnlineButton, 
+              { backgroundColor: isOnline ? colors.error : colors.primary }
             ]}
-            activeOpacity={0.8}
+            onPress={handleToggleOnline}
+            activeOpacity={0.9}
           >
-            <Ionicons
-              name={isOnline ? 'pause-circle-outline' : 'play-circle-outline'}
-              size={20}
-              color={isOnline ? colors.text.primary : '#ffffff'}
-            />
-            <Text
-              style={[
-                styles.toggleButtonText,
-                { color: isOnline ? colors.text.primary : '#ffffff' },
-              ]}
-            >
-              {isOnline ? 'Go Offline' : 'Go Online'}
-            </Text>
+              <Text style={styles.goOnlineText}>
+                 {isOnline ? 'Go offline' : 'Go online'}
+              </Text>
           </TouchableOpacity>
-
-          {isOnline && (
-            <View style={styles.waitingContainer}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.waitingText}>
-                Waiting for pickup requests...
-              </Text>
-            </View>
-          )}
         </View>
 
-        {/* Earnings Summary */}
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          style={styles.earningsCard}
-        >
-          <Text style={styles.earningsLabel}>Today's Earnings</Text>
-          <View style={styles.earningsRow}>
-            <Text style={styles.earningsAmount}>
-              GH₵ {stats.todayEarnings.toFixed(2)}
-            </Text>
-            <View style={styles.earningsRight}>
-              <Text style={styles.earningsSubLabel}>Trips</Text>
-              <Text style={styles.earningsTrips}>{stats.todayTrips}</Text>
-            </View>
-          </View>
-          <View style={styles.weeklyContainer}>
-            <View>
-              <Text style={styles.weeklyLabel}>This Week</Text>
-              <Text style={styles.weeklyAmount}>
-                GH₵ {stats.weeklyEarnings.toFixed(2)}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Trips')}
-              style={styles.viewDetailsButton}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.viewDetailsText}>View History</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+        {/* Bottom Tools & Actions Sheet Spacer - takes up middle space */}
+        <View style={{ flex: 1 }} pointerEvents="none" />
 
-        {/* Performance Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Performance</Text>
-          <View style={styles.performanceGrid}>
-            <View style={styles.performanceItem}>
-              <View style={[styles.iconCircle, { backgroundColor: '#fef3c7' }]}>
-                <Ionicons name="star" size={20} color="#facc15" />
-              </View>
-              <Text style={styles.performanceValue}>{stats.rating}</Text>
-              <Text style={styles.performanceLabel}>Rating</Text>
-            </View>
-            <View style={styles.performanceItem}>
-              <View style={[styles.iconCircle, { backgroundColor: colors.blue[100] }]}>
-                <Ionicons name="location" size={20} color={colors.blue[600]} />
-              </View>
-              <Text style={styles.performanceValue}>{stats.totalTrips}</Text>
-              <Text style={styles.performanceLabel}>Total Trips</Text>
-            </View>
-            <View style={styles.performanceItem}>
-              <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight }]}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-              </View>
-              <Text style={styles.performanceValue}>{stats.acceptanceRate}%</Text>
-              <Text style={styles.performanceLabel}>Acceptance</Text>
-            </View>
-          </View>
+        {/* Bottom Controls Area */}
+        <View style={styles.controlsArea} pointerEvents="box-none">
+           {/* Floating Action Buttons */}
+           <View style={styles.floatingControlsBlock} pointerEvents="box-none">
+              <TouchableOpacity style={styles.floatingActionButton} onPress={recenterMap}>
+                  <Ionicons name="locate" size={22} color="#000" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.floatingActionButton}>
+                  <Ionicons name="options-outline" size={22} color="#000" />
+              </TouchableOpacity>
+           </View>
+           
+           {/* Performance Card */}
+           <View style={styles.performanceCardWrapper}>
+             <View style={styles.performanceCard}>
+               <Text style={styles.performanceCardTitle}>Performance</Text>
+               <View style={styles.performanceGrid}>
+                 <View style={styles.performanceItem}>
+                   <View style={[styles.iconCircle, { backgroundColor: '#fef3c7' }]}>
+                     <Ionicons name="star" size={20} color="#facc15" />
+                   </View>
+                   <Text style={styles.performanceValue}>{stats.rating}</Text>
+                   <Text style={styles.performanceLabel}>Rating</Text>
+                 </View>
+                 <View style={styles.performanceItem}>
+                   <View style={[styles.iconCircle, { backgroundColor: '#e0f2fe' }]}>
+                     <Ionicons name="location" size={20} color="#0284c7" />
+                   </View>
+                   <Text style={styles.performanceValue}>{stats.totalTrips}</Text>
+                   <Text style={styles.performanceLabel}>Total Trips</Text>
+                 </View>
+                 <View style={styles.performanceItem}>
+                   <View style={[styles.iconCircle, { backgroundColor: '#dcfce7' }]}>
+                     <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
+                   </View>
+                   <Text style={styles.performanceValue}>{stats.acceptanceRate}%</Text>
+                   <Text style={styles.performanceLabel}>Acceptance</Text>
+                 </View>
+               </View>
+             </View>
+           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.card}>
-          <Text style={[styles.cardTitle, { fontSize: 14 }]}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Trips')}
-              style={styles.actionItem}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.blue[100] }]}>
-                <Ionicons name="time-outline" size={20} color={colors.blue[600]} />
-              </View>
-              <Text style={styles.actionLabel}>History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Support')}
-              style={styles.actionItem}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.amber[100] }]}>
-                <Ionicons name="help-circle-outline" size={20} color={colors.amber[600]} />
-              </View>
-              <Text style={styles.actionLabel}>Support</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+      </SafeAreaView>
 
-
-
-        {/* Tips Card */}
-        <View style={styles.tipCard}>
-          <View style={styles.tipIcon}>
-            <Ionicons name="bulb-outline" size={20} color="#ffffff" />
-          </View>
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>Pro Tip</Text>
-            <Text style={styles.tipText}>
-              Peak hours are 7-9 AM and 5-7 PM. Go online during these times to
-              earn bonus payments!
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Online Confirmation Modal */}
-      <Modal
-        visible={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        showCloseButton={false}
-      >
-        <View style={styles.modalContent}>
-          <View style={styles.modalIcon}>
-            <Ionicons name="play-circle" size={48} color={colors.primary} />
-          </View>
-          <Text style={styles.modalTitle}>Go Online?</Text>
-          <Text style={styles.modalText}>
-            You'll start receiving pickup requests. Make sure you're ready to
-            accept trips.
-          </Text>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              onPress={() => setShowConfirmModal(false)}
-              style={[styles.modalButton, styles.modalButtonCancel]}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.modalButtonTextCancel}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={confirmGoOnline}
-              style={[styles.modalButton, styles.modalButtonConfirm]}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.modalButtonTextConfirm}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Online Notification */}
       <Toast
         visible={showNotification}
-        message="You're Now Online!"
-        subtitle="Waiting for pickup requests..."
-        type="success"
+        message={isOnline ? "You're Now Online!" : "You're Now Offline"}
+        subtitle={isOnline ? "Waiting for pickup requests..." : "Stop driving for now."}
+        type={isOnline ? "success" : "info"}
         onHide={() => setShowNotification(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
+
+const mapStyle = [
+  {
+    "elementType": "labels.icon",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "featureType": "poi",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "featureType": "transit",
+    "stylers": [{ "visibility": "off" }]
+  }
+];
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: '#daedd4',
   },
-  header: {
-    paddingTop: 10,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  loadingContainer: {
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: '#fff',
   },
-  headerContent: {
+  map: {
+    width: width,
+    height: height,
+    ...StyleSheet.absoluteFillObject,
+  },
+  overlay: {
+    flex: 1,
+  },
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+  earningsPill: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  headerTitle: {
+  earningsValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontWeight: '800',
+    color: '#000',
   },
-  profileButton: {
+  earningsLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    fontWeight: '500',
+    marginTop: -2,
+  },
+  controlsArea: {
+    justifyContent: 'flex-end',
+  },
+  floatingControlsBlock: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    marginBottom: -20, 
+    zIndex: 10,
+  },
+  floatingActionButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  scrollView: {
+  actionToggleWrapper: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    zIndex: 20,
+    transform: [{ translateY: 24 }],  
+  },
+  goOnlineButton: {
+    width: '100%',
+    maxWidth: 400,
+    paddingVertical: 18,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  goOnlineText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  bottomSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 36, 
+    paddingBottom: Platform.OS === 'ios' ? 0 : 20,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+    minHeight: 180,
+  },
+  sheetHandleWrapper: {
+    position: 'absolute',
+    top: 8,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.gray[300],
+  },
+  alertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+  },
+  alertOuterIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffeaea',
+    marginRight: 12,
+  },
+  alertInnerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.error,
+  },
+  alertTextContent: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 16,
-    paddingBottom: 80,
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 4,
   },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statusContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  statusLabel: {
+  alertSubtitle: {
     fontSize: 14,
     color: colors.text.secondary,
-    marginBottom: 8,
   },
-  statusText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  toggleButton: {
-    width: '100%',
+  promoCard: {
     paddingVertical: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
+    paddingHorizontal: 4,
+  },
+  promoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+  },
+  markerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+  },
+  markerHighlight: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  carIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  performanceCardWrapper: {
+    paddingHorizontal: 16,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 30,
+  },
+  performanceCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
+    shadowRadius: 4,
     elevation: 3,
   },
-  toggleButtonText: {
+  performanceCardTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  waitingContainer: {
-    marginTop: 16,
-    backgroundColor: colors.primaryLighter,
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-  },
-  waitingText: {
-    fontSize: 14,
-    color: colors.primaryDark,
-  },
-  earningsCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  earningsLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 12,
-  },
-  earningsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: 16,
-  },
-  earningsAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  earningsRight: {
-    alignItems: 'flex-end',
-  },
-  earningsSubLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  earningsTrips: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  weeklyContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  weeklyLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  weeklyAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  viewDetailsButton: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  viewDetailsText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 16,
   },
   performanceGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
   },
   performanceItem: {
     alignItems: 'center',
+    flex: 1,
   },
   iconCircle: {
     width: 48,
@@ -633,128 +765,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   performanceValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 4,
   },
   performanceLabel: {
     fontSize: 12,
-    color: colors.text.secondary,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  actionItem: {
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    backgroundColor: colors.gray[50],
-    borderRadius: 12,
-    minWidth: 90,
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionLabel: {
-    fontSize: 12,
-    color: colors.text.primary,
-    fontWeight: '500',
-  },
-  tipCard: {
-    backgroundColor: colors.blue[50],
-    borderWidth: 1,
-    borderColor: colors.blue[100],
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  tipIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.blue[600],
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  tipContent: {
-    flex: 1,
-  },
-  tipTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  tipText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    lineHeight: 18,
-  },
-  modalContent: {
-    alignItems: 'center',
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: colors.gray[200],
-  },
-  modalButtonConfirm: {
-    backgroundColor: colors.primary,
-  },
-  modalButtonTextCancel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  modalButtonTextConfirm: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
+    color: '#666',
+  }
 });
-
-
-
-
-
-
-

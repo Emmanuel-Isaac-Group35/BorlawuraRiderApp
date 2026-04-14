@@ -1,117 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   StatusBar,
   Linking,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
-import { Toast } from '../../components/common/Toast';
 import { supabase } from '../../lib/supabase';
-import { useEffect } from 'react';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
+import * as Location from 'expo-location';
+
+const { width, height } = Dimensions.get('window');
+const GOOGLE_MAPS_API_KEY = "AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4";
+const ROUTE_BLUE = '#1A73E8';
+
+// Custom minimalist map style
+const mapStyle = [
+  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] }
+];
 
 type RootStackParamList = {
   MainTabs: undefined;
   ActiveTrip: { trip?: any };
+  Tracking: { trip?: any };
   TripComplete: { trip?: any };
-  Support: undefined;
 };
 
 type ActiveTripRouteProp = RouteProp<RootStackParamList, 'ActiveTrip'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type TripStatus = 'driving_to_pickup' | 'arrived_at_pickup' | 'waste_collected';
+type TripStatus = 'accept_to_tracking' | 'driving_to_pickup' | 'arrived_at_pickup' | 'waste_collected';
 
 export default function ActiveTripPage() {
   const navigation = useNavigation<NavigationProp>();
-  const [currentStatus, setCurrentStatus] = useState<TripStatus>('driving_to_pickup');
-  const [showContactMenu, setShowContactMenu] = useState(false);
-  const [showDisposalSites, setShowDisposalSites] = useState(false);
-  const [showSiteNotification, setShowSiteNotification] = useState(false);
-  const [selectedSite, setSelectedSite] = useState('');
-
   const route = useRoute<ActiveTripRouteProp>();
   const dbTrip = route.params?.trip;
-
+  
+  const mapRef = useRef<MapView>(null);
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<TripStatus>('accept_to_tracking');
+  const [routeInfo, setRouteInfo] = useState<{distance: number, duration: number} | null>(null);
+  
   const [customerName, setCustomerName] = useState(
     (dbTrip?.customer_name && dbTrip?.customer_name !== 'Customer') ? dbTrip.customer_name : 
     (dbTrip?.customerName && dbTrip?.customerName !== 'Customer') ? dbTrip.customerName :
-    (dbTrip?.user_name) ? dbTrip.user_name : 
-    (dbTrip?.full_name) ? dbTrip.full_name :
     'Customer'
   );
 
-
-  useEffect(() => {
-    async function fetchCustomerDetails() {
-      const tripId = dbTrip?.user_id || dbTrip?.userId || dbTrip?.customer_id;
-      const currentName = customerName;
-
-      if (tripId && (!currentName || currentName === 'Customer')) {
-        // Try profiles first, handle 42P01 (missing table) gracefully
-        let { data, error } = await supabase
-          .from('profiles')
-          .select('full_name, first_name, last_name, email')
-          .eq('id', tripId)
-          .maybeSingle();
-
-        // Fallback to users if profile/rider missing
-        if (!data || error?.code === '42P01') {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('full_name, phone_number, email')
-            .eq('id', tripId)
-            .maybeSingle();
-          if (userData) {
-            // @ts-ignore
-            data = { ...userData, first_name: null, last_name: null };
-          }
-        }
-
-        // Fallback to riders if still missing
-        if (!data) {
-          const { data: riderData } = await supabase
-            .from('riders')
-            .select('first_name, last_name, email, phone_number')
-            .eq('id', tripId)
-            .maybeSingle();
-          if (riderData) {
-            // @ts-ignore
-            data = { ...riderData, full_name: null };
-          }
-        }
-
-        if (data) {
-          const resolvedName = data.full_name || 
-                              (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : 
-                              (data.email?.split('@')[0] || 'Customer'));
-          setCustomerName(resolvedName);
-          
-          // Persistence: Update the database record if it was missing
-          if (dbTrip?.id && (!dbTrip.customer_name || dbTrip.customer_name === 'Customer')) {
-            await supabase
-              .from('orders')
-              .update({ customer_name: resolvedName })
-              .eq('id', dbTrip.id);
-          }
-        }
-      }
-    }
-    fetchCustomerDetails();
-  }, [dbTrip?.user_id, dbTrip?.userId, dbTrip?.customer_id, dbTrip?.customer_name, dbTrip?.customerName]);
-
-
-
-
-
+  // Determine Coordinates
   let lat = Number(dbTrip?.pickup_latitude) || Number(dbTrip?.pickup_lat);
   let lng = Number(dbTrip?.pickup_longitude) || Number(dbTrip?.pickup_lng);
   
@@ -122,780 +68,360 @@ export default function ActiveTripPage() {
       lng = Number(coordsMatch[2]);
     }
   }
+  
+  const destination = { lat: lat || 5.6037, lng: lng || -0.1870 };
+  const pickupAddress = dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location';
 
-  const tripData = {
-    customerName: customerName,
-    pickupLocation: dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location',
-    wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
-    estimatedFare: Number(dbTrip?.amount || dbTrip?.fare) || 0,
-    pickupCoordinates: { lat: lat || 5.6037, lng: lng || -0.1870 }
-  };
-
-  const disposalSites = [
-    { name: 'Kpone Landfill Site', distance: 3.2, address: 'Kpone, Greater Accra' },
-    { name: 'Tema Waste Transfer Station', distance: 5.8, address: 'Community 1, Tema' },
-    { name: 'Accra Compost Plant', distance: 7.1, address: 'Adjen Kotoku, Accra' }
-  ];
-
-  const statusSteps = [
-    { key: 'driving_to_pickup', label: 'Driving to Pickup', icon: 'car-outline' },
-    { key: 'arrived_at_pickup', label: 'Arrived at Pickup', icon: 'location-outline' },
-    { key: 'waste_collected', label: 'Waste Collected', icon: 'checkmark-circle-outline' }
-  ];
-
-  const getCurrentStepIndex = () => {
-    return statusSteps.findIndex(step => step.key === currentStatus);
-  };
-
-  const handleNextStep = async () => {
-    const currentIndex = getCurrentStepIndex();
-    if (currentIndex < statusSteps.length - 1) {
-      const nextStatus = statusSteps[currentIndex + 1].key as TripStatus;
-      setCurrentStatus(nextStatus);
-      
-      // Update sub_status in database
-      if (dbTrip?.id) {
-        await supabase
-          .from('orders')
-          .update({ sub_status: nextStatus })
-          .eq('id', dbTrip.id);
+  useEffect(() => {
+    // Name fetching logic
+    async function fetchCustomerDetails() {
+      const tripId = dbTrip?.user_id || dbTrip?.userId || dbTrip?.customer_id;
+      if (tripId && (!customerName || customerName === 'Customer')) {
+        const { data } = await supabase.from('profiles').select('full_name, first_name, last_name, email').eq('id', tripId).maybeSingle();
+        if (data) {
+          const resolvedName = data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : (data.email?.split('@')[0] || 'Customer'));
+          setCustomerName(resolvedName);
+        }
       }
-    } else {
-      navigation.navigate('TripComplete', { trip: dbTrip });
+    }
+    fetchCustomerDetails();
+
+    let subscription: Location.LocationSubscription;
+    const startTracking = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      // Show the map quickly: cached fix first, then a fast fresh fix, then periodic updates.
+      const lastKnown = await Location.getLastKnownPositionAsync({
+        maxAge: 120000,
+        requiredAccuracy: 5000,
+      });
+      if (lastKnown) {
+        setCurrentLocation(lastKnown);
+      }
+
+      try {
+        const quickFresh = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+        });
+        setCurrentLocation(quickFresh);
+      } catch {
+        if (!lastKnown) {
+          const fallback = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          setCurrentLocation(fallback);
+        }
+      }
+
+      subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 10000,
+          distanceInterval: 25,
+        },
+        (newLoc) => setCurrentLocation(newLoc)
+      );
+    };
+    startTracking();
+    return () => subscription?.remove();
+  }, [dbTrip]);
+
+  const handleAction = async () => {
+    if (currentStatus === 'accept_to_tracking') {
+      setCurrentStatus('driving_to_pickup');
+      // Optionally open real turn-by-turn navigation in Google Maps App
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`;
+      Linking.openURL(url).catch(() => {});
+    } else if (currentStatus === 'driving_to_pickup') {
+      setCurrentStatus('arrived_at_pickup');
+      if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id);
+    } else if (currentStatus === 'arrived_at_pickup') {
+      setCurrentStatus('waste_collected');
+      if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'waste_collected' }).eq('id', dbTrip.id);
+    } else if (currentStatus === 'waste_collected') {
+      navigation.replace('TripComplete', { trip: dbTrip });
     }
   };
 
   const getButtonText = () => {
-    switch (currentStatus) {
-      case 'driving_to_pickup':
-        return 'Arrived at Pickup';
-      case 'arrived_at_pickup':
-        return 'Waste Collected';
-      case 'waste_collected':
-        return 'Complete Trip';
-      default:
-        return 'Next';
-    }
+    if (currentStatus === 'accept_to_tracking') return 'Start Tracking';
+    if (currentStatus === 'driving_to_pickup') return 'Arrived at Pickup';
+    if (currentStatus === 'arrived_at_pickup') return 'Waste Collected';
+    if (currentStatus === 'waste_collected') return 'Complete Trip';
+    return 'Next';
   };
-
+  
   const handleCall = () => {
-    const phoneFromNotes = dbTrip?.notes?.match(/\[Phone:\s*(\+?\d+)\]/)?.[1];
-    const phone = dbTrip?.customer_phone || dbTrip?.customerPhone || phoneFromNotes || '+233501234567';
+    const phone = dbTrip?.customer_phone || '+233501234567';
     Linking.openURL(`tel:${phone}`);
-    setShowContactMenu(false);
   };
 
-  const handleMessage = () => {
-    const phoneFromNotes = dbTrip?.notes?.match(/\[Phone:\s*(\+?\d+)\]/)?.[1];
-    const phone = dbTrip?.customer_phone || dbTrip?.customerPhone || phoneFromNotes || '+233501234567';
-    Linking.openURL(`sms:${phone}`);
-    setShowContactMenu(false);
-  };
-
-  const handleNavigate = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${tripData.pickupCoordinates.lat},${tripData.pickupCoordinates.lng}`;
-    Linking.openURL(url);
-  };
-
-  const handleDisposalSiteSelect = (site: typeof disposalSites[0]) => {
-    setShowDisposalSites(false);
-    setSelectedSite(site.name);
-    setShowSiteNotification(true);
-
-    setTimeout(() => {
-      setShowSiteNotification(false);
-    }, 3000);
-  };
+  if (!currentLocation) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.text.secondary }}>Acquiring GPS...</Text>
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primary]}
-        style={styles.header}
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        customMapStyle={mapStyle}
+        initialRegion={{
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }}
+        showsUserLocation={false} 
+        showsMyLocationButton={false}
+        showsCompass={false}
       >
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Active Trip</Text>
-          <View style={styles.statusBadge}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>In Progress</Text>
-          </View>
-        </View>
-      </LinearGradient>
-
-      {/* Main Content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Progress Steps */}
-        <View style={styles.card}>
-          <Text style={[styles.cardTitle, { fontSize: 14 }]}>Trip Progress</Text>
-          <View style={styles.stepsContainer}>
-            {statusSteps.map((step, index) => {
-              const isCompleted = index < getCurrentStepIndex();
-              const isCurrent = index === getCurrentStepIndex();
-              const isPending = index > getCurrentStepIndex();
-
-              return (
-                <View key={step.key} style={styles.stepItem}>
-                  <View
-                    style={[
-                      styles.stepIcon,
-                      isCompleted && styles.stepIconCompleted,
-                      isCurrent && styles.stepIconCurrent,
-                      isPending && styles.stepIconPending,
-                    ]}
-                  >
-                    <Ionicons
-                      name={step.icon as any}
-                      size={20}
-                      color={
-                        isCompleted
-                          ? '#ffffff'
-                          : isCurrent
-                            ? colors.primary
-                            : colors.text.light
-                      }
-                    />
-                  </View>
-                  <View style={styles.stepContent}>
-                    <Text
-                      style={[
-                        styles.stepLabel,
-                        (isCompleted || isCurrent) && styles.stepLabelActive,
-                        isPending && styles.stepLabelPending,
-                      ]}
-                    >
-                      {step.label}
-                    </Text>
-                    {isCurrent && (
-                      <Text style={styles.stepStatus}>Current step</Text>
-                    )}
-                  </View>
-                  {isCompleted && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={24}
-                      color={colors.primary}
-                    />
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Customer Info */}
-        <View style={styles.card}>
-          <View style={styles.customerHeader}>
-            <View style={styles.customerLeft}>
-              <View style={styles.customerIcon}>
-                <Ionicons name="person-outline" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.customerInfo}>
-                <Text style={styles.customerName}>{tripData.customerName}</Text>
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={12} color="#facc15" />
-                  <Text style={styles.rating}>4.8</Text>
-                </View>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={() => setShowContactMenu(!showContactMenu)}
-              style={styles.contactButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="call-outline" size={20} color={colors.blue[600]} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Contact Menu */}
-          {showContactMenu && (
-            <View style={styles.contactMenu}>
-              <TouchableOpacity
-                onPress={handleCall}
-                style={styles.contactMenuItem}
-                activeOpacity={0.7}
-              >
-                <View style={styles.contactMenuIcon}>
-                  <Ionicons name="call" size={16} color={colors.blue[600]} />
-                </View>
-                <Text style={styles.contactMenuText}>Call Customer</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleMessage}
-                style={styles.contactMenuItem}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.contactMenuIcon, { backgroundColor: colors.primaryLight }]}>
-                  <Ionicons name="chatbubble" size={16} color={colors.primary} />
-                </View>
-                <Text style={styles.contactMenuText}>Send Message</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Location Info */}
-          <View style={styles.locationRow}>
-            <View style={[styles.locationIcon, { backgroundColor: colors.blue[100] }]}>
-              <Ionicons name="location-outline" size={20} color={colors.blue[600]} />
-            </View>
-            <View style={styles.locationInfo}>
-              <Text style={styles.locationLabel}>Pickup Location</Text>
-              <Text style={styles.locationValue}>{tripData.pickupLocation}</Text>
+        {/* Rider marker */}
+        <Marker coordinate={{ latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude }} zIndex={10}>
+          <View style={styles.riderMarker}>
+            <View style={styles.riderMarkerInner}>
+              <Ionicons name="car" size={18} color="#fff" />
             </View>
           </View>
-        </View>
+        </Marker>
 
-        {/* Waste Type & Fare */}
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <View style={[styles.infoIcon, { backgroundColor: colors.amber[100] }]}>
-              <Ionicons name="trash-outline" size={20} color={colors.amber[600]} />
-            </View>
-            <Text style={styles.infoLabel}>Waste Type</Text>
-            <Text style={styles.infoValue}>{tripData.wasteType}</Text>
+        {/* Destination marker */}
+        <Marker coordinate={{ latitude: destination.lat, longitude: destination.lng }} zIndex={5}>
+          <View style={styles.destMarker}>
+             <Ionicons name="location" size={24} color={colors.primary} />
           </View>
-          <LinearGradient
-            colors={[colors.primary, colors.primaryDark]}
-            style={[styles.infoCard, styles.fareCard]}
-          >
-            <View style={styles.infoIconWhite}>
-              <Ionicons name="cash-outline" size={20} color="#ffffff" />
-            </View>
-            <Text style={styles.infoLabelWhite}>Fare</Text>
-            <Text style={styles.infoValueWhite}>
-              GH₵ {tripData.estimatedFare.toFixed(2)}
-            </Text>
-          </LinearGradient>
-        </View>
+        </Marker>
 
-        {/* Navigation & Disposal Sites */}
-        <View style={styles.actionContainer}>
-          <TouchableOpacity
-            onPress={handleNavigate}
-            style={styles.navigateButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="navigate" size={20} color="#ffffff" />
-            <Text style={styles.navigateButtonText}>Open in Google Maps</Text>
+        {/* Route Line */}
+        <MapViewDirections
+          origin={{
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+          }}
+          destination={{ latitude: destination.lat, longitude: destination.lng }}
+          apikey={GOOGLE_MAPS_API_KEY}
+          mode="DRIVING"
+          precision="low"
+          strokeWidth={6}
+          strokeColor={ROUTE_BLUE}
+          lineCap="round"
+          lineJoin="round"
+          optimizeWaypoints={false}
+          resetOnChange={true}
+          onReady={(result) => {
+            setRouteInfo({ distance: result.distance, duration: result.duration });
+            mapRef.current?.fitToCoordinates(result.coordinates, {
+              edgePadding: { top: 120, right: 40, bottom: 220, left: 40 },
+              animated: true,
+            });
+          }}
+          onError={(err) => {
+            console.warn('Map routing error: ', err);
+          }}
+        />
+      </MapView>
+
+      {/* Floating Top Header */}
+      <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
+        <View style={styles.headerPill}>
+          <TouchableOpacity onPress={() => navigation.navigate('MainTabs')} style={styles.iconButton}>
+            <Ionicons name="close" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-
-          {currentStatus === 'waste_collected' && (
-              <TouchableOpacity
-                onPress={() => setShowDisposalSites(!showDisposalSites)}
-                style={styles.disposalButton}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="business-outline" size={20} color={colors.primary} />
-                <Text style={styles.disposalButtonText}>View Disposal Sites</Text>
-              </TouchableOpacity>
-            )}
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle} numberOfLines={1}>{pickupAddress}</Text>
+            <Text style={styles.headerSubtitle}>{customerName}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Tracking', { trip: dbTrip })}
+            style={styles.iconButton}
+            accessibilityLabel="Open live tracking map"
+          >
+            <Ionicons name="map-outline" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleCall} style={styles.iconButton}>
+            <Ionicons name="call" size={22} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Disposal Sites List */}
-        {showDisposalSites && (
-          <View style={styles.card}>
-            <Text style={[styles.cardTitle, { fontSize: 14 }]}>
-              Nearby Disposal Sites
-            </Text>
-            <View style={styles.sitesList}>
-              {disposalSites.map((site, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => handleDisposalSiteSelect(site)}
-                  style={styles.siteItem}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.siteIcon}>
-                    <Ionicons
-                      name="business-outline"
-                      size={20}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <View style={styles.siteInfo}>
-                    <Text style={styles.siteName}>{site.name}</Text>
-                    <Text style={styles.siteAddress}>{site.address}</Text>
-                  </View>
-                  <Text style={styles.siteDistance}>{site.distance} km</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        {routeInfo && currentStatus === 'driving_to_pickup' && (
+          <View style={styles.etaPill}>
+            <Text style={styles.etaTime}>{Math.ceil(routeInfo.duration)} min</Text>
+            <Text style={styles.etaDist}>{routeInfo.distance.toFixed(1)} km</Text>
           </View>
         )}
+      </SafeAreaView>
 
-        {/* Help Alert */}
-        <View style={styles.helpCard}>
-          <View style={styles.helpIcon}>
-            <Ionicons name="information-circle-outline" size={18} color={colors.amber[600]} />
-          </View>
-          <View style={styles.helpContent}>
-            <Text style={styles.helpTitle}>Need Help?</Text>
-            <Text style={styles.helpText}>
-              Contact support if you encounter any issues during the trip.
-            </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Support')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.helpLink}>Contact Support →</Text>
-            </TouchableOpacity>
-          </View>
+      {/* Floating Bottom Car */}
+      <View style={styles.bottomOverlay}>
+        <View style={styles.bottomCard}>
+          <TouchableOpacity
+            style={[
+              styles.actionButton, 
+              currentStatus === 'accept_to_tracking' ? styles.startNavBtn : styles.primaryBtn
+            ]}
+            onPress={handleAction}
+            activeOpacity={0.8}
+          >
+            <Ionicons 
+              name={currentStatus === 'accept_to_tracking' ? 'navigate' : 'checkmark-circle'} 
+              size={24} 
+              color="#fff" 
+            />
+            <Text style={styles.actionButtonText}>{getButtonText()}</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-
-      {/* Site Selection Notification */}
-      <Toast
-        visible={showSiteNotification}
-        message="Disposal Site Selected"
-        subtitle={selectedSite}
-        type="success"
-        onHide={() => setShowSiteNotification(false)}
-      />
-
-      {/* Action Button */}
-      <View style={styles.actionBar}>
-        <TouchableOpacity
-          onPress={handleNextStep}
-          style={styles.nextButton}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-          <Text style={styles.nextButtonText}>{getButtonText()}</Text>
-        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: '#f4f4f4',
   },
-  header: {
-    paddingTop: 10,
-    paddingBottom: 16,
+  map: {
+    width: width,
+    height: height,
+  },
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    paddingTop: 10,
+    zIndex: 10,
   },
-  headerContent: {
+  headerPill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  iconButton: {
+    padding: 4,
+  },
+  headerTextContainer: {
+    flex: 1,
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ffffff',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 16,
-    paddingBottom: 100,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginBottom: 16,
+    textAlign: 'center',
   },
-  stepsContainer: {
-    gap: 12,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  stepIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepIconCompleted: {
-    backgroundColor: colors.primary,
-  },
-  stepIconCurrent: {
-    backgroundColor: colors.primaryLight,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  stepIconPending: {
-    backgroundColor: colors.gray[100],
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  stepLabelActive: {
-    color: colors.text.primary,
-  },
-  stepLabelPending: {
-    color: colors.text.light,
-  },
-  stepStatus: {
+  headerSubtitle: {
     fontSize: 12,
-    color: colors.primary,
+    color: colors.text.secondary,
     marginTop: 2,
   },
-  customerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  customerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  customerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  customerInfo: {
-    flex: 1,
-  },
-  customerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  rating: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  contactButton: {
-    width: 40,
-    height: 40,
+  etaPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
     borderRadius: 20,
-    backgroundColor: colors.blue[100],
-    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
     alignItems: 'center',
   },
-  contactMenu: {
-    backgroundColor: colors.blue[50],
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    gap: 8,
-  },
-  contactMenuItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  contactMenuIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.blue[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contactMenuText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  locationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  locationInfo: {
-    flex: 1,
-  },
-  locationLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  locationValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  infoCard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  fareCard: {
-    padding: 16,
-  },
-  infoIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoIconWhite: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  infoLabelWhite: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 4,
-  },
-  infoValueWhite: {
+  etaTime: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
   },
-  actionContainer: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  navigateButton: {
-    backgroundColor: colors.blue[600],
-    paddingVertical: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  navigateButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  etaDist: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
     fontWeight: '600',
   },
-  disposalButton: {
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  disposalButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sitesList: {
-    gap: 8,
-  },
-  siteItem: {
-    backgroundColor: colors.gray[50],
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  siteIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  siteInfo: {
-    flex: 1,
-  },
-  siteName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  siteAddress: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  siteDistance: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.primary,
-  },
-  helpCard: {
-    backgroundColor: colors.amber[100],
-    borderWidth: 1,
-    borderColor: colors.amber[100],
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  helpIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.amber[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  helpContent: {
-    flex: 1,
-  },
-  helpTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  helpText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginBottom: 8,
-    lineHeight: 18,
-  },
-  helpLink: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.primary,
-  },
-  actionBar: {
+  bottomOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[200],
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    zIndex: 10,
   },
-  nextButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
+  bottomCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingTop: 20,
+    paddingBottom: 36,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
     gap: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 5,
   },
-  nextButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  startNavBtn: {
+    backgroundColor: colors.blue[600],
   },
+  primaryBtn: {
+    backgroundColor: colors.primary,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  riderMarker: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  riderMarkerInner: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  destMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
 });
-
-
-
-
-
-
-

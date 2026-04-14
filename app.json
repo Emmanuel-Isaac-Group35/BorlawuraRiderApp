@@ -16,7 +16,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.borlawura.rider"
+      "bundleIdentifier": "com.borlawura.rider",
+      "config": {
+        "googleMapsApiKey": "AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +33,12 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

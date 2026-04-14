@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,15 +10,17 @@ import {
   Image,
   Switch,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../utils/colors';
 import { Modal } from '../../components/common/Modal';
 import { riderProfile } from '../../mocks/rider';
+import { useAuth } from '../../contexts/AuthContext';
+import { fetchStats } from '../../lib/api';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -29,34 +31,32 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-import { useAuth } from '../../contexts/AuthContext';
-import { fetchStats } from '../../lib/api';
-
-
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-
 export default function ProfilePage() {
   const navigation = useNavigation<NavigationProp>();
   const { signOut, profile, user } = useAuth();
   const [stats, setStats] = useState({ totalTrips: 0, rating: 5.0 });
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
-  
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [soundAlerts, setSoundAlerts] = useState(true);
+  const [autoAccept, setAutoAccept] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       if (user?.id) {
          loadRiderStats();
       }
-    }, [user?.id, profile?.rating]) // Include profile.rating as dependency
+    }, [user?.id, profile?.rating])
   );
-
 
   const loadRiderStats = async () => {
      try {
        if (user?.id) {
           const data = await fetchStats(user.id);
-          // @ts-ignore - mismatch in object structure vs state
+          // @ts-ignore
           setStats({
             totalTrips: data.totalTrips,
             rating: profile?.rating || 5.0
@@ -69,21 +69,10 @@ export default function ProfilePage() {
      }
   };
 
-  const [showBankModal, setShowBankModal] = useState(false);
-
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [soundAlerts, setSoundAlerts] = useState(true);
-  const [autoAccept, setAutoAccept] = useState(false);
-
   const [editForm, setEditForm] = useState({
     name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : riderProfile.name,
     phone: profile?.phone || riderProfile.phone,
     email: profile?.email || riderProfile.email
-  });
-
-  const [bankForm, setBankForm] = useState({
-    momoProvider: 'MTN',
-    momoNumber: '0501234567'
   });
 
   const handleSaveProfile = () => {
@@ -91,12 +80,10 @@ export default function ProfilePage() {
       Alert.alert('Error', 'Please enter a valid name (at least 2 characters)');
       return;
     }
-
     if (!editForm.phone || editForm.phone.trim().length < 10) {
       Alert.alert('Error', 'Please enter a valid phone number');
       return;
     }
-
     if (editForm.email && editForm.email.trim() !== '') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(editForm.email)) {
@@ -104,24 +91,8 @@ export default function ProfilePage() {
         return;
       }
     }
-
     setShowEditModal(false);
     Alert.alert('Success', 'Profile updated successfully!');
-  };
-
-  const handleSaveBank = () => {
-    if (!bankForm.momoNumber || bankForm.momoNumber.trim().length < 10) {
-      Alert.alert('Error', 'Please enter a valid Mobile Money number');
-      return;
-    }
-
-    if (!bankForm.momoProvider) {
-      Alert.alert('Error', 'Please select a Mobile Money provider');
-      return;
-    }
-
-    setShowBankModal(false);
-    Alert.alert('Success', 'Payment details updated successfully!');
   };
 
   const handleLogout = () => {
@@ -134,323 +105,220 @@ export default function ProfilePage() {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            try {
-              await signOut();
-            } catch (error) {
-              console.error('Error logging out:', error);
-              Alert.alert('Error', 'Failed to logout');
-            }
+            try { await signOut(); } 
+            catch (error) { Alert.alert('Error', 'Failed to logout'); }
           },
         },
       ]
     );
   };
 
+  const displayName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : riderProfile.name;
+  const displayPhone = profile?.phone || riderProfile.phone;
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
+      
       {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.primary]}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Home')}
-            style={styles.homeButton}
-          >
-            <Ionicons name="home-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Account</Text>
+      </View>
 
-      {/* Main Content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Card */}
-        <View style={styles.card}>
-          <View style={styles.profileHeader}>
-            <View style={styles.profileImageContainer}>
-              <Image
-                source={{ uri: profile?.avatar_url || riderProfile.profilePhoto }}
-                style={styles.profileImage}
-              />
-              <TouchableOpacity
-                onPress={() => setShowEditModal(true)}
-                style={styles.cameraButton}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="camera" size={14} color="#ffffff" />
-              </TouchableOpacity>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        {/* Profile Hero Section */}
+        <View style={styles.heroSection}>
+          <TouchableOpacity onPress={() => setShowEditModal(true)} style={styles.avatarContainer} activeOpacity={0.8}>
+            <Image source={{ uri: profile?.avatar_url || riderProfile.profilePhoto }} style={styles.avatar} />
+            <View style={styles.editAvatarBadge}>
+               <Ionicons name="pencil" size={14} color="#ffffff" />
             </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : riderProfile.name}</Text>
-              <Text style={styles.profilePhone}>{profile?.phone || riderProfile.phone}</Text>
-              <View style={styles.profileBadges}>
-                <View style={styles.badge}>
-                  <Ionicons name="star" size={14} color="#facc15" />
-                  <Text style={styles.badgeText}>{stats.rating.toFixed(1)}</Text>
-                </View>
-                <View style={[styles.badge, { backgroundColor: colors.blue[100] }]}>
-                  <Text style={[styles.badgeText, { color: colors.blue[600] }]}>
-                    {stats.totalTrips} {stats.totalTrips === 1 ? 'trip' : 'trips'}
-                  </Text>
-                </View>
-              </View>
-
+          </TouchableOpacity>
+          <Text style={styles.heroName}>{displayName}</Text>
+          <Text style={styles.heroPhone}>{displayPhone}</Text>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statPill}>
+              <Ionicons name="star" size={16} color="#facc15" />
+              <Text style={styles.statText}>{stats.rating.toFixed(1)} Rating</Text>
+            </View>
+            <View style={[styles.statPill, { backgroundColor: colors.primaryLighter }]}>
+              <Ionicons name="car-sport" size={16} color={colors.primaryDark} />
+              <Text style={[styles.statText, { color: colors.primaryDark }]}>{stats.totalTrips} Trips</Text>
             </View>
           </View>
-          <TouchableOpacity
-            onPress={() => setShowEditModal(true)}
-            style={styles.editButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="create-outline" size={18} color="#ffffff" />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Verification Status */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Verification Status</Text>
+        {/* Modular Sections */}
+        <Text style={styles.sectionHeader}>VERIFICATION</Text>
+        <View style={styles.moduleBlock}>
           {[
-            { label: "Rider's License", status: 'verified', icon: 'id-card-outline' },
-            { label: 'Tricycle Registration', status: 'verified', icon: 'car-outline' },
-            { label: 'Insurance', status: 'verified', icon: 'shield-checkmark-outline' },
-            { label: 'Background Check', status: 'verified', icon: 'search-outline' }
-          ].map((item, index) => (
-            <View key={index} style={styles.verificationItem}>
-              <View style={styles.verificationLeft}>
-                <View style={styles.verificationIcon}>
-                  <Ionicons name={item.icon as any} size={20} color={colors.primary} />
+            { label: "Rider's License", icon: 'id-card' },
+            { label: 'Tricycle Registration', icon: 'car' },
+            { label: 'Insurance', icon: 'shield-checkmark' },
+            { label: 'Background Check', icon: 'search' }
+          ].map((item, index, arr) => (
+            <View key={index} style={[styles.moduleRow, index === arr.length - 1 && styles.noBorder]}>
+              <View style={styles.moduleRowLeft}>
+                <View style={styles.moduleIconBox}>
+                  <Ionicons name={item.icon as any} size={20} color={colors.text.secondary} />
                 </View>
-                <Text style={styles.verificationLabel}>{item.label}</Text>
+                <Text style={styles.moduleLabel}>{item.label}</Text>
               </View>
-              <View style={styles.verificationRight}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                <Text style={styles.verificationStatus}>Verified</Text>
+              <View style={styles.moduleRowRight}>
+                 <Text style={styles.verifiedText}>Verified</Text>
+                 <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               </View>
             </View>
           ))}
         </View>
 
-        {/* Settings */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Settings</Text>
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: colors.blue[100] }]}>
-                <Ionicons name="notifications-outline" size={20} color={colors.blue[600]} />
+        <Text style={styles.sectionHeader}>PREFERENCES</Text>
+        <View style={styles.moduleBlock}>
+          <View style={styles.moduleRow}>
+            <View style={styles.moduleRowLeft}>
+              <View style={[styles.moduleIconBox, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="notifications" size={20} color="#EF4444" />
               </View>
               <View>
-                <Text style={styles.settingLabel}>Push Notifications</Text>
-                <Text style={styles.settingDescription}>Receive trip alerts</Text>
+                <Text style={styles.moduleLabel}>Push Notifications</Text>
+                <Text style={styles.moduleSubLabel}>Alerts for new bookings</Text>
               </View>
             </View>
-            <Switch
-              value={pushNotifications}
-              onValueChange={setPushNotifications}
-              trackColor={{ false: colors.gray[300], true: colors.primary }}
-              thumbColor="#ffffff"
-            />
+            <Switch value={pushNotifications} onValueChange={setPushNotifications} trackColor={{ false: colors.gray[200], true: colors.primary }} />
           </View>
 
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: colors.amber[100] }]}>
-                <Ionicons name="volume-high-outline" size={20} color={colors.amber[600]} />
+          <View style={styles.moduleRow}>
+            <View style={styles.moduleRowLeft}>
+              <View style={[styles.moduleIconBox, { backgroundColor: '#E0E7FF' }]}>
+                <Ionicons name="volume-high" size={20} color="#4F46E5" />
               </View>
               <View>
-                <Text style={styles.settingLabel}>Sound Alerts</Text>
-                <Text style={styles.settingDescription}>Audio for new requests</Text>
+                <Text style={styles.moduleLabel}>Sound Alerts</Text>
+                <Text style={styles.moduleSubLabel}>Chimes during requests</Text>
               </View>
             </View>
-            <Switch
-              value={soundAlerts}
-              onValueChange={setSoundAlerts}
-              trackColor={{ false: colors.gray[300], true: colors.primary }}
-              thumbColor="#ffffff"
-            />
+            <Switch value={soundAlerts} onValueChange={setSoundAlerts} trackColor={{ false: colors.gray[200], true: colors.primary }} />
           </View>
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#e9d5ff' }]}>
-                <Ionicons name="flash-outline" size={20} color="#9333ea" />
+          
+          <View style={[styles.moduleRow, styles.noBorder]}>
+            <View style={styles.moduleRowLeft}>
+              <View style={[styles.moduleIconBox, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="flash" size={20} color="#D97706" />
               </View>
               <View>
-                <Text style={styles.settingLabel}>Auto-Accept</Text>
-                <Text style={styles.settingDescription}>Automatically accept trips</Text>
+                <Text style={styles.moduleLabel}>Auto-Accept Mode</Text>
+                <Text style={styles.moduleSubLabel}>Automatically accept near trips</Text>
               </View>
             </View>
-            <Switch
-              value={autoAccept}
-              onValueChange={setAutoAccept}
-              trackColor={{ false: colors.gray[300], true: colors.primary }}
-              thumbColor="#ffffff"
-            />
-          </View>
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() => navigation.navigate('AuditLogs')}
-          >
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: colors.gray[200] }]}>
-                <Ionicons name="document-text-outline" size={20} color={colors.text.secondary} />
-              </View>
-              <View>
-                <Text style={styles.settingLabel}>Audit Logs</Text>
-                <Text style={styles.settingDescription}>View account activity</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Payment Details */}
-        <View style={styles.card}>
-          <View style={styles.paymentHeader}>
-            <Text style={styles.cardTitle}>Payment Details</Text>
-            <TouchableOpacity
-              onPress={() => setShowBankModal(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.editLink}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.momoCard}>
-            <View style={styles.momoIcon}>
-              <Ionicons name="phone-portrait-outline" size={24} color="#ffffff" />
-            </View>
-            <View>
-              <Text style={styles.momoProvider}>
-                {bankForm.momoProvider} Mobile Money
-              </Text>
-              <Text style={styles.momoNumber}>{bankForm.momoNumber}</Text>
-            </View>
+            <Switch value={autoAccept} onValueChange={setAutoAccept} trackColor={{ false: colors.gray[200], true: colors.primary }} />
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Support')}
-            style={styles.actionButton}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: colors.blue[100] }]}>
-              <Ionicons name="help-circle-outline" size={20} color={colors.blue[600]} />
-            </View>
-            <Text style={styles.actionText}>Help & Support</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleLogout}
-            style={styles.actionButton}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#fee2e2' }]}>
-              <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-            </View>
-            <Text style={[styles.actionText, { color: '#ef4444' }]}>Logout</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
-          </TouchableOpacity>
+        <Text style={styles.sectionHeader}>SUPPORT & SECURITY</Text>
+        <View style={[styles.moduleBlock, { paddingVertical: 8 }]}>
+           <TouchableOpacity 
+             style={styles.simpleRow}
+             onPress={() => navigation.navigate('AuditLogs')}
+             activeOpacity={0.7}
+           >
+              <Text style={styles.simpleRowLabel}>Audit Logs</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.gray[300]} />
+           </TouchableOpacity>
+           <View style={styles.divider} />
+           <TouchableOpacity 
+             style={styles.simpleRow}
+             onPress={() => navigation.navigate('Support')}
+             activeOpacity={0.7}
+           >
+              <Text style={styles.simpleRowLabel}>Help Center</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.gray[300]} />
+           </TouchableOpacity>
+           <View style={styles.divider} />
+           <TouchableOpacity 
+             style={styles.simpleRow}
+             onPress={() => setShowTermsModal(true)}
+             activeOpacity={0.7}
+           >
+              <Text style={styles.simpleRowLabel}>Terms & Conditions</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.gray[300]} />
+           </TouchableOpacity>
+           <View style={styles.divider} />
+           <TouchableOpacity 
+             style={styles.simpleRow}
+             onPress={() => setShowPrivacyModal(true)}
+             activeOpacity={0.7}
+           >
+              <Text style={styles.simpleRowLabel}>Privacy Policy</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.gray[300]} />
+           </TouchableOpacity>
         </View>
 
-        {/* App Version */}
-        <Text style={styles.versionText}>Borla Wura Partner v1.0.0</Text>
+        {/* Logout Button */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.8}>
+           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+           <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.versionText}>Borlawura Rider App v1.0.0</Text>
       </ScrollView>
 
       {/* Edit Profile Modal */}
-      <Modal
-        visible={showEditModal}
-        onClose={() => setShowEditModal(false)}
-      >
-        <Text style={styles.modalTitle}>Edit Profile</Text>
-        <View style={styles.modalForm}>
-          <View style={styles.modalInputContainer}>
-            <Text style={styles.modalLabel}>Full Name</Text>
-            <TextInput
-              value={editForm.name}
-              onChangeText={(text) => setEditForm({ ...editForm, name: text })}
-              style={styles.modalInput}
-              placeholder="Enter your full name"
-            />
+      <Modal visible={showEditModal} onClose={() => setShowEditModal(false)}>
+        <Text style={styles.modalTitle}>Update Profile</Text>
+        <View style={styles.modalFormWrapper}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Full Name</Text>
+            <TextInput style={styles.inputField} value={editForm.name} onChangeText={t => setEditForm({...editForm, name: t})} />
           </View>
-
-          <View style={styles.modalInputContainer}>
-            <Text style={styles.modalLabel}>Phone Number</Text>
-            <TextInput
-              value={editForm.phone}
-              onChangeText={(text) => setEditForm({ ...editForm, phone: text })}
-              style={styles.modalInput}
-              placeholder="0501234567"
-              keyboardType="phone-pad"
-            />
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Phone Number</Text>
+            <TextInput style={styles.inputField} value={editForm.phone} keyboardType="phone-pad" onChangeText={t => setEditForm({...editForm, phone: t})} />
           </View>
-
-          <View style={styles.modalInputContainer}>
-            <Text style={styles.modalLabel}>Email</Text>
-            <TextInput
-              value={editForm.email}
-              onChangeText={(text) => setEditForm({ ...editForm, email: text })}
-              style={styles.modalInput}
-              placeholder="email@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <TextInput style={styles.inputField} value={editForm.email || ''} keyboardType="email-address" onChangeText={t => setEditForm({...editForm, email: t})} />
           </View>
         </View>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+      </Modal>
 
-        <TouchableOpacity
-          onPress={handleSaveProfile}
-          style={styles.modalSaveButton}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.modalSaveButtonText}>Save Changes</Text>
+      {/* Terms & Conditions Modal */}
+      <Modal visible={showTermsModal} onClose={() => setShowTermsModal(false)}>
+        <Text style={styles.modalTitle}>Terms & Conditions</Text>
+        <ScrollView style={styles.policyScroll} showsVerticalScrollIndicator={false}>
+          <Text style={styles.policyText}>
+            Welcome to the Borlawura Rider App. By accessing or using this platform, you agree to be bound by the following terms:{"\n\n"}
+            <Text style={{fontWeight: '700'}}>1. Service Obligations:</Text> As a verified rider, you commit to completing all accepted waste collection requests safely and efficiently. Punctuality and professional conduct are strictly required.{"\n\n"}
+            <Text style={{fontWeight: '700'}}>2. Vehicle Eligibility:</Text> You are required to keep your registered tricycle well-maintained, insured, and thoroughly inspected. You are fully responsible for all direct operational and maintenance costs.{"\n\n"}
+            <Text style={{fontWeight: '700'}}>3. Fair Usage & Platform Safety:</Text> Do not manipulate the Borlawura system or forge completion certificates. Any misrepresentation will result in immediate suspension or total account termination.{"\n\n"}
+            <Text style={{fontWeight: '700'}}>4. Financial Transactions:</Text> All fares are calculated based on distance and type of waste. A standard platform commission applies to all completed trips, and payouts are securely executed to your provided Mobile Money account.{"\n\n"}
+            By continuing to access the Borlawura network, you signify that you consent to all present and future modifications made to these terms.
+          </Text>
+        </ScrollView>
+        <TouchableOpacity style={styles.saveBtn} onPress={() => setShowTermsModal(false)}>
+          <Text style={styles.saveBtnText}>Understood</Text>
         </TouchableOpacity>
       </Modal>
 
-      {/* Bank Details Modal */}
-      <Modal
-        visible={showBankModal}
-        onClose={() => setShowBankModal(false)}
-      >
-        <Text style={styles.modalTitle}>Payment Details</Text>
-        <View style={styles.modalForm}>
-          <View style={styles.modalInputContainer}>
-            <Text style={styles.modalLabel}>Mobile Money Provider</Text>
-            <View style={styles.modalSelect}>
-              <Text style={styles.modalSelectText}>{bankForm.momoProvider} Mobile Money</Text>
-              <Ionicons name="chevron-down" size={20} color={colors.text.secondary} />
-            </View>
-          </View>
-
-          <View style={styles.modalInputContainer}>
-            <Text style={styles.modalLabel}>Mobile Money Number</Text>
-            <TextInput
-              value={bankForm.momoNumber}
-              onChangeText={(text) => setBankForm({ ...bankForm, momoNumber: text })}
-              style={styles.modalInput}
-              placeholder="0501234567"
-              keyboardType="phone-pad"
-            />
-          </View>
-        </View>
-
-        <TouchableOpacity
-          onPress={handleSaveBank}
-          style={styles.modalSaveButton}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.modalSaveButtonText}>Save Changes</Text>
+      {/* Privacy Policy Modal */}
+      <Modal visible={showPrivacyModal} onClose={() => setShowPrivacyModal(false)}>
+        <Text style={styles.modalTitle}>Privacy Policy</Text>
+        <ScrollView style={styles.policyScroll} showsVerticalScrollIndicator={false}>
+          <Text style={styles.policyText}>
+            Your privacy is our priority. This document outlines how Borlawura collects and secures your rider data:{"\n\n"}
+            <Text style={{fontWeight: '700'}}>1. Location Tracking:</Text> This app tracks your precise geographical location strictly to connect you with nearby customers and display live routes. We only access this data while you are actively toggled "Online".{"\n\n"}
+            <Text style={{fontWeight: '700'}}>2. Data Security:</Text> All personal identification documents (such as your Driver's License or Tricycle Registration) are encrypted at rest. We never sell your data to third-party institutions.{"\n\n"}
+            <Text style={{fontWeight: '700'}}>3. Communications:</Text> To facilitate pickups, customers are temporarily granted access to your registered phone number once a trip is active. This connection ends when the job is completed or cancelled.{"\n\n"}
+            Please contact the Support center if you have any pressing concerns regarding your data retention limits or you wish to process an account deletion.
+          </Text>
+        </ScrollView>
+        <TouchableOpacity style={styles.saveBtn} onPress={() => setShowPrivacyModal(false)}>
+          <Text style={styles.saveBtnText}>Close</Text>
         </TouchableOpacity>
       </Modal>
+
     </SafeAreaView>
   );
 }
@@ -458,334 +326,236 @@ export default function ProfilePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryLighter,
+    backgroundColor: '#F3F4F6', // Off-white modern background
   },
   header: {
-    paddingTop: 10,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: '#F3F4F6',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  homeButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#111827',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingTop: 16,
-    paddingBottom: 80,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  profileHeader: {
-    flexDirection: 'row',
+  heroSection: {
     alignItems: 'center',
-    gap: 16,
+    marginTop: 16,
+    marginBottom: 32,
+  },
+  avatarContainer: {
+    position: 'relative',
     marginBottom: 16,
   },
-  profileImageContainer: {
-    position: 'relative',
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: colors.primaryLight,
-  },
-  cameraButton: {
+  editAvatarBadge: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.primary,
+    borderWidth: 3,
+    borderColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+  heroName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: 4,
   },
-  profilePhone: {
-    fontSize: 14,
-    color: colors.text.secondary,
+  heroPhone: {
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF9C3', // subtle yellow
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  statText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#A16207',
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9CA3AF',
     marginBottom: 8,
+    marginLeft: 8,
+    letterSpacing: 0.8,
   },
-  profileBadges: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  editButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  editButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 16,
-  },
-  verificationItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  verificationLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  verificationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  verificationLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  verificationRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  verificationStatus: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.primary,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  settingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  settingDescription: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  paymentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  editLink: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.primary,
-  },
-  momoCard: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  momoIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  momoProvider: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  momoNumber: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  actionsContainer: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  actionButton: {
+  moduleBlock: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  moduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  noBorder: {
+    borderBottomWidth: 0,
+  },
+  moduleRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  moduleIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionText: {
-    flex: 1,
+  moduleLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  moduleSubLabel: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  moduleRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  verifiedText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  simpleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  simpleRowLabel: {
+     fontSize: 15,
+     fontWeight: '500',
+     color: '#4B5563',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 4,
+  },
+  logoutButton: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  logoutText: {
+    color: '#EF4444',
     fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.primary,
+    fontWeight: '700',
   },
   versionText: {
-    fontSize: 12,
-    color: colors.text.light,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 16,
+    color: '#D1D5DB',
+    fontSize: 12,
+    fontWeight: '600',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
     marginBottom: 24,
     textAlign: 'center',
   },
-  modalForm: {
+  modalFormWrapper: {
     gap: 16,
     marginBottom: 24,
   },
-  modalInputContainer: {
+  inputGroup: {
     gap: 8,
   },
-  modalLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginLeft: 4,
   },
-  modalInput: {
-    backgroundColor: colors.gray[50],
-    borderWidth: 2,
-    borderColor: colors.gray[200],
+  inputField: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: colors.text.primary,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
   },
-  modalSelect: {
-    backgroundColor: colors.gray[50],
-    borderWidth: 2,
-    borderColor: colors.gray[200],
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  modalSelectText: {
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  modalSaveButton: {
+  saveBtn: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
-  modalSaveButtonText: {
+  saveBtnText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
+  policyScroll: {
+    maxHeight: 400,
+    marginBottom: 20,
+  },
+  policyText: {
+    fontSize: 15,
+    color: '#4B5563',
+    lineHeight: 24,
+  }
 });
-
-
-
-
-
-
-
