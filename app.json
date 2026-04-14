@@ -43,6 +43,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "extra": {
+      "openRouteServiceApiKey": ""
+    },
     "plugins": [
       [
         "expo-location",

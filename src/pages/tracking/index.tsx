@@ -5,12 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
-import MapViewDirections from 'react-native-maps-directions';
 import * as Location from 'expo-location';
+import { useOpenRouteDirections } from '../../hooks/useOpenRouteDirections';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../utils/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,8 +24,6 @@ import {
 } from '../../utils/orderLocation';
 
 const { width, height } = Dimensions.get('window');
-
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -47,13 +44,36 @@ export default function TrackingPage() {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
-  const [routeError, setRouteError] = useState(false);
 
   const pickupCoords = useMemo(() => resolvePickupFromOrder(order), [order]);
   const pickupAddress = useMemo(() => pickupAddressFromOrder(order), [order]);
   const pickupShort =
     pickupAddress.split(',').map((s) => s.trim()).filter(Boolean)[0] || pickupAddress;
   const customerName = useMemo(() => customerNameFromOrder(order), [order]);
+
+  const routeOrigin = useMemo(
+    () =>
+      location
+        ? {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          }
+        : null,
+    [location?.coords.latitude, location?.coords.longitude]
+  );
+  const routeDestination = useMemo(
+    () =>
+      pickupCoords
+        ? { latitude: pickupCoords.lat, longitude: pickupCoords.lng }
+        : null,
+    [pickupCoords?.lat, pickupCoords?.lng]
+  );
+
+  const {
+    coordinates: routeCoords,
+    loading: routeLoading,
+    error: routeFetchError,
+  } = useOpenRouteDirections(routeOrigin, routeDestination, 750);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,10 +139,6 @@ export default function TrackingPage() {
   }, [order?.id]);
 
   useEffect(() => {
-    setRouteError(false);
-  }, [pickupCoords?.lat, pickupCoords?.lng]);
-
-  useEffect(() => {
     const initializeLocation = async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -178,6 +194,19 @@ export default function TrackingPage() {
   }, [location?.coords.latitude, location?.coords.longitude, pickupCoords?.lat, pickupCoords?.lng]);
 
   useEffect(() => {
+    if (!routeCoords?.length || routeCoords.length < 2 || !mapRef.current) return;
+    mapRef.current.fitToCoordinates(routeCoords, {
+      edgePadding: {
+        right: width / 12,
+        bottom: height / 4,
+        left: width / 12,
+        top: height / 8,
+      },
+      animated: true,
+    });
+  }, [routeCoords]);
+
+  useEffect(() => {
     let subscription: Location.LocationSubscription;
 
     const startWatching = async () => {
@@ -219,6 +248,18 @@ export default function TrackingPage() {
 
   const fitBoth = () => {
     if (!location || !pickupCoords || !mapRef.current) return;
+    if (routeCoords && routeCoords.length >= 2) {
+      mapRef.current.fitToCoordinates(routeCoords, {
+        edgePadding: {
+          right: width / 12,
+          bottom: height / 4,
+          left: width / 12,
+          top: height / 8,
+        },
+        animated: true,
+      });
+      return;
+    }
     mapRef.current.fitToCoordinates(
       [
         { latitude: location.coords.latitude, longitude: location.coords.longitude },
@@ -235,6 +276,11 @@ export default function TrackingPage() {
       }
     );
   };
+
+  useEffect(() => {
+    if (!routeFetchError || routeFetchError === 'missing_api_key') return;
+    console.warn('OpenRouteService:', routeFetchError);
+  }, [routeFetchError]);
 
   if (errorMsg) {
     return (
@@ -348,47 +394,15 @@ export default function TrackingPage() {
           </View>
         </Marker>
 
-        {!routeError ? (
-          <MapViewDirections
-            key={`${pickupCoords.lat}-${pickupCoords.lng}`}
-            origin={{
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            }}
-            destination={{
-              latitude: pickupCoords.lat,
-              longitude: pickupCoords.lng,
-            }}
-            apikey={GOOGLE_MAPS_API_KEY}
-            strokeWidth={5}
+        {routeCoords && routeCoords.length >= 2 ? (
+          <Polyline
+            coordinates={routeCoords}
             strokeColor={colors.blue[600]}
-            mode="DRIVING"
-            precision="low"
-            optimizeWaypoints={false}
+            strokeWidth={5}
             lineCap="round"
             lineJoin="round"
-            onError={(errorMessage) => {
-              console.warn('Directions API failed:', errorMessage);
-              setRouteError(true);
-              fitBoth();
-              Alert.alert(
-                'Maps API issue',
-                'Directions could not be loaded. Showing a straight line instead. Enable the Directions API for your key if needed.'
-              );
-            }}
-            onReady={(result) => {
-              mapRef.current?.fitToCoordinates(result.coordinates, {
-                edgePadding: {
-                  right: width / 12,
-                  bottom: height / 4,
-                  left: width / 12,
-                  top: height / 8,
-                },
-                animated: true,
-              });
-            }}
           />
-        ) : (
+        ) : !routeLoading ? (
           <Polyline
             coordinates={[
               { latitude: location.coords.latitude, longitude: location.coords.longitude },
@@ -398,7 +412,7 @@ export default function TrackingPage() {
             strokeWidth={5}
             lineDashPattern={[5, 10]}
           />
-        )}
+        ) : null}
       </MapView>
 
       <TouchableOpacity style={styles.recenterFab} onPress={fitBoth} activeOpacity={0.85}>

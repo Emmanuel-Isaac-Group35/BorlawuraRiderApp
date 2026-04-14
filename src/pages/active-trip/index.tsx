@@ -15,12 +15,11 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../utils/colors';
 import { supabase } from '../../lib/supabase';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import MapViewDirections from 'react-native-maps-directions';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { useOpenRouteDirections } from '../../hooks/useOpenRouteDirections';
 
 const { width, height } = Dimensions.get('window');
-const GOOGLE_MAPS_API_KEY = "AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4";
 const ROUTE_BLUE = '#1A73E8';
 
 // Custom minimalist map style
@@ -71,6 +70,39 @@ export default function ActiveTripPage() {
   
   const destination = { lat: lat || 5.6037, lng: lng || -0.1870 };
   const pickupAddress = dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location';
+
+  const routeOrigin = currentLocation
+    ? {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      }
+    : null;
+  const routeDestination = {
+    latitude: destination.lat,
+    longitude: destination.lng,
+  };
+
+  const {
+    coordinates: routeCoordinates,
+    summary: routeSummary,
+    loading: routeLoading,
+  } = useOpenRouteDirections(routeOrigin, routeDestination, 750);
+
+  useEffect(() => {
+    if (routeSummary) {
+      setRouteInfo({ distance: routeSummary.distanceKm, duration: routeSummary.durationMin });
+    } else {
+      setRouteInfo(null);
+    }
+  }, [routeSummary]);
+
+  useEffect(() => {
+    if (!routeCoordinates?.length || routeCoordinates.length < 2 || !mapRef.current) return;
+    mapRef.current.fitToCoordinates(routeCoordinates, {
+      edgePadding: { top: 120, right: 40, bottom: 220, left: 40 },
+      animated: true,
+    });
+  }, [routeCoordinates]);
 
   useEffect(() => {
     // Name fetching logic
@@ -201,33 +233,28 @@ export default function ActiveTripPage() {
           </View>
         </Marker>
 
-        {/* Route Line */}
-        <MapViewDirections
-          origin={{
-            latitude: currentLocation.coords.latitude,
-            longitude: currentLocation.coords.longitude,
-          }}
-          destination={{ latitude: destination.lat, longitude: destination.lng }}
-          apikey={GOOGLE_MAPS_API_KEY}
-          mode="DRIVING"
-          precision="low"
-          strokeWidth={6}
-          strokeColor={ROUTE_BLUE}
-          lineCap="round"
-          lineJoin="round"
-          optimizeWaypoints={false}
-          resetOnChange={true}
-          onReady={(result) => {
-            setRouteInfo({ distance: result.distance, duration: result.duration });
-            mapRef.current?.fitToCoordinates(result.coordinates, {
-              edgePadding: { top: 120, right: 40, bottom: 220, left: 40 },
-              animated: true,
-            });
-          }}
-          onError={(err) => {
-            console.warn('Map routing error: ', err);
-          }}
-        />
+        {routeCoordinates && routeCoordinates.length >= 2 ? (
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor={ROUTE_BLUE}
+            strokeWidth={6}
+            lineCap="round"
+            lineJoin="round"
+          />
+        ) : !routeLoading ? (
+          <Polyline
+            coordinates={[
+              {
+                latitude: currentLocation.coords.latitude,
+                longitude: currentLocation.coords.longitude,
+              },
+              { latitude: destination.lat, longitude: destination.lng },
+            ]}
+            strokeColor={ROUTE_BLUE}
+            strokeWidth={4}
+            lineDashPattern={[6, 10]}
+          />
+        ) : null}
       </MapView>
 
       {/* Floating Top Header */}
