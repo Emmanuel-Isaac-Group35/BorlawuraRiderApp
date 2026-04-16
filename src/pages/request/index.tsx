@@ -170,10 +170,36 @@ export default function RequestPage() {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (timeLeft === 0 && !hasDeclinedRef.current) {
-      hasDeclinedRef.current = true;
-      handleDecline();
+      handleDecline(true); // missed request counts as decline
     }
   }, [timeLeft, isAccepting]);
+
+  // Listen for user cancellation during the request ring
+  useEffect(() => {
+    if (!fullTripData?.id) return;
+    const cancelSubscription = supabase
+      .channel(`request-cancel-${fullTripData.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${fullTripData.id}`
+        },
+        (payload) => {
+          if (payload.new.status === 'cancelled') {
+             Alert.alert('Request Cancelled', 'The customer just cancelled this pickup request.');
+             handleDecline(false); // don't penalize rider
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(cancelSubscription);
+    };
+  }, [fullTripData?.id]);
 
 
   const handleAccept = async () => {
@@ -199,17 +225,36 @@ export default function RequestPage() {
       }
 
       setIsAccepting(false);
-      navigation.replace('ActiveTrip', { trip });
-    } catch (error: any) {
+      
+      // Navigate after a success alert
+      Alert.alert(
+        'Order Accepted', 
+        'You have successfully accepted this trip.',
+        [
+          { text: 'OK', onPress: () => navigation.replace('ActiveTrip', { trip }) }
+        ]
+      );
+    } catch (error) {
       console.error('Error accepting trip:', error);
       setIsAccepting(false);
-      Alert.alert('Acceptance Failed', error.message || 'Could not accept this order. Please try again or check your connection.');
+      Alert.alert(
+        'Acceptance Failed', 
+        (error as any).message || 'Could not accept this order. Please try again or check your connection.'
+      );
     }
   };
 
-  const handleDecline = () => {
+  const handleDecline = async (penalize: boolean = true) => {
     if (!hasDeclinedRef.current) {
       hasDeclinedRef.current = true;
+      if (user?.id && penalize) {
+         // Silently log decline for accurate acceptance rate calculation
+         supabase.from('audit_logs').insert({
+             user_id: user.id,
+             action: 'request_declined',
+             details: { trip_id: trip?.id }
+         }).then(() => {}).catch(() => {});
+      }
     }
     navigation.goBack();
   };

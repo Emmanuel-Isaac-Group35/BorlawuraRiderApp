@@ -11,6 +11,7 @@ import {
   Switch,
   Alert,
   Linking,
+  ActivityIndicator as RNActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -21,6 +22,8 @@ import { Modal } from '../../components/common/Modal';
 import { riderProfile } from '../../mocks/rider';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchStats } from '../../lib/api';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '../../lib/supabase';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -33,12 +36,13 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ProfilePage() {
   const navigation = useNavigation<NavigationProp>();
-  const { signOut, profile, user } = useAuth();
+  const { signOut, profile, user, refreshProfile } = useAuth();
   const [stats, setStats] = useState({ totalTrips: 0, rating: 5.0 });
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
 
   const [pushNotifications, setPushNotifications] = useState(true);
   const [soundAlerts, setSoundAlerts] = useState(true);
@@ -113,6 +117,67 @@ export default function ProfilePage() {
     );
   };
 
+  const handleDocumentUpdate = async (type: 'license' | 'ghana_card' | 'vehicle' | 'avatar') => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && user?.id) {
+        setUploading(type);
+        const asset = result.assets[0];
+        const fileExt = asset.uri.split('.').pop();
+        const fileName = `${user.id}_${type}_${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const formData = new FormData();
+        formData.append('file', {
+          uri: asset.uri,
+          name: fileName,
+          type: asset.mimeType || 'image/jpeg',
+        } as any);
+
+        const { error: uploadError } = await supabase.storage
+          .from('rider_documents')
+          .upload(filePath, formData, {
+            contentType: asset.mimeType || 'image/jpeg',
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('rider_documents')
+          .getPublicUrl(filePath);
+
+        const columnMap = {
+          license: 'license_photo_url',
+          ghana_card: 'ghana_card_photo_url',
+          vehicle: 'vehicle_photo_url',
+          avatar: 'avatar_url'
+        };
+
+        const { error: dbError } = await supabase
+          .from('riders')
+          .update({ [columnMap[type]]: publicUrl })
+          .eq('id', user.id);
+
+        if (dbError) throw dbError;
+
+        // Force an immediate refresh of the local profile data to update UI to 'Verified'
+        await refreshProfile();
+
+        Alert.alert('Success', `${type === 'avatar' ? 'Profile photo' : 'Document'} updated successfully`);
+      }
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Upload Failed', error.message || 'An error occurred during upload');
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const displayName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : riderProfile.name;
   const displayPhone = profile?.phone || riderProfile.phone;
 
@@ -129,14 +194,25 @@ export default function ProfilePage() {
         
         {/* Profile Hero Section */}
         <View style={styles.heroSection}>
-          <TouchableOpacity onPress={() => setShowEditModal(true)} style={styles.avatarContainer} activeOpacity={0.8}>
+          <TouchableOpacity onPress={() => handleDocumentUpdate('avatar')} style={styles.avatarContainer} activeOpacity={0.8} disabled={uploading === 'avatar'}>
             <Image source={{ uri: profile?.avatar_url || riderProfile.profilePhoto }} style={styles.avatar} />
-            <View style={styles.editAvatarBadge}>
-               <Ionicons name="pencil" size={14} color="#ffffff" />
-            </View>
+            {uploading === 'avatar' ? (
+              <View style={[styles.avatar, styles.avatarOverlay]}>
+                <RNActivityIndicator size="small" color="#fff" />
+              </View>
+            ) : (
+              <View style={styles.editAvatarBadge}>
+                <Ionicons name="camera" size={16} color="#ffffff" />
+              </View>
+            )}
           </TouchableOpacity>
           <Text style={styles.heroName}>{displayName}</Text>
           <Text style={styles.heroPhone}>{displayPhone}</Text>
+          
+          <TouchableOpacity onPress={() => setShowEditModal(true)} style={styles.editInfoBtn}>
+             <Ionicons name="create-outline" size={14} color={colors.primary} />
+             <Text style={styles.editInfoBtnText}>Edit Profile</Text>
+          </TouchableOpacity>
           
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
@@ -154,12 +230,16 @@ export default function ProfilePage() {
         <Text style={styles.sectionHeader}>VERIFICATION</Text>
         <View style={styles.moduleBlock}>
           {[
-            { label: "Rider's License", icon: 'id-card' },
-            { label: 'Tricycle Registration', icon: 'car' },
-            { label: 'Insurance', icon: 'shield-checkmark' },
-            { label: 'Background Check', icon: 'search' }
+            { label: 'Rider License', icon: 'card', verified: !!profile?.license_photo_url, type: 'license' },
+            { label: 'National ID (Ghana Card)', icon: 'id-card', verified: !!profile?.ghana_card_photo_url, type: 'ghana_card' },
+            { label: 'Tricycle Registration', icon: 'car', verified: !!profile?.vehicle_photo_url, type: 'vehicle' },
           ].map((item, index, arr) => (
-            <View key={index} style={[styles.moduleRow, index === arr.length - 1 && styles.noBorder]}>
+            <TouchableOpacity 
+              key={index} 
+              style={[styles.moduleRow, index === arr.length - 1 && styles.noBorder]}
+              onPress={() => handleDocumentUpdate(item.type as any)}
+              disabled={uploading !== null}
+            >
               <View style={styles.moduleRowLeft}>
                 <View style={styles.moduleIconBox}>
                   <Ionicons name={item.icon as any} size={20} color={colors.text.secondary} />
@@ -167,10 +247,21 @@ export default function ProfilePage() {
                 <Text style={styles.moduleLabel}>{item.label}</Text>
               </View>
               <View style={styles.moduleRowRight}>
-                 <Text style={styles.verifiedText}>Verified</Text>
-                 <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                 {uploading === item.type ? (
+                   <RNActivityIndicator size="small" color={colors.primary} />
+                 ) : item.verified ? (
+                   <>
+                     <Text style={styles.verifiedText}>Verified</Text>
+                     <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                   </>
+                 ) : (
+                   <>
+                     <Text style={[styles.verifiedText, { color: colors.error }]}>Update</Text>
+                     <Ionicons name="cloud-upload-outline" size={20} color={colors.error} />
+                   </>
+                 )}
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
@@ -360,6 +451,14 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
   },
+  avatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   editAvatarBadge: {
     position: 'absolute',
     bottom: 0,
@@ -372,6 +471,22 @@ const styles = StyleSheet.create({
     borderColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  editInfoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    marginBottom: 16,
+    backgroundColor: colors.primaryLighter,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  editInfoBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   heroName: {
     fontSize: 22,

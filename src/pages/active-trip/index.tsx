@@ -8,6 +8,7 @@ import {
   Linking,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -55,6 +56,7 @@ export default function ActiveTripPage() {
     (dbTrip?.customerName && dbTrip?.customerName !== 'Customer') ? dbTrip.customerName :
     'Customer'
   );
+  const [customerPhone, setCustomerPhone] = useState(dbTrip?.customer_phone || dbTrip?.customerPhone || '');
 
   // Determine Coordinates
   let lat = Number(dbTrip?.pickup_latitude) || Number(dbTrip?.pickup_lat);
@@ -105,18 +107,46 @@ export default function ActiveTripPage() {
   }, [routeCoordinates]);
 
   useEffect(() => {
-    // Name fetching logic
+    // Name and Phone fetching logic
     async function fetchCustomerDetails() {
       const tripId = dbTrip?.user_id || dbTrip?.userId || dbTrip?.customer_id;
-      if (tripId && (!customerName || customerName === 'Customer')) {
-        const { data } = await supabase.from('profiles').select('full_name, first_name, last_name, email').eq('id', tripId).maybeSingle();
+      if (tripId) {
+        const { data } = await supabase.from('profiles').select('full_name, first_name, last_name, email, phone, phone_number').eq('id', tripId).maybeSingle();
         if (data) {
-          const resolvedName = data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : (data.email?.split('@')[0] || 'Customer'));
-          setCustomerName(resolvedName);
+          if (!customerName || customerName === 'Customer') {
+             const resolvedName = data.full_name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : (data.email?.split('@')[0] || 'Customer'));
+             setCustomerName(resolvedName);
+          }
+          if (!customerPhone && (data.phone || data.phone_number)) {
+             setCustomerPhone(data.phone || data.phone_number);
+          }
         }
       }
     }
     fetchCustomerDetails();
+
+    // Listen for real-time customer cancellations
+    const cancelSubscription = supabase
+      .channel(`active-trip-cancel-${dbTrip?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${dbTrip?.id}`
+        },
+        (payload) => {
+          if (payload.new.status === 'cancelled') {
+             Alert.alert(
+               'Order Cancelled',
+               'The customer has cancelled this pickup request. Returning to Home...',
+               [{ text: 'OK', onPress: () => navigation.navigate('MainTabs') }]
+             );
+          }
+        }
+      )
+      .subscribe();
 
     let subscription: Location.LocationSubscription;
     const startTracking = async () => {
@@ -156,7 +186,10 @@ export default function ActiveTripPage() {
       );
     };
     startTracking();
-    return () => subscription?.remove();
+    return () => {
+      subscription?.remove();
+      supabase.removeChannel(cancelSubscription);
+    };
   }, [dbTrip]);
 
   const handleAction = async () => {
@@ -172,6 +205,13 @@ export default function ActiveTripPage() {
       setCurrentStatus('waste_collected');
       if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'waste_collected' }).eq('id', dbTrip.id);
     } else if (currentStatus === 'waste_collected') {
+      if (dbTrip?.id) {
+        await supabase.from('orders').update({ 
+          status: 'completed', 
+          sub_status: 'completed',
+          completed_at: new Date().toISOString() 
+        }).eq('id', dbTrip.id);
+      }
       navigation.replace('TripComplete', { trip: dbTrip });
     }
   };
@@ -185,8 +225,12 @@ export default function ActiveTripPage() {
   };
   
   const handleCall = () => {
-    const phone = dbTrip?.customer_phone || '+233501234567';
-    Linking.openURL(`tel:${phone}`);
+    const phoneToCall = customerPhone || dbTrip?.customer_phone || dbTrip?.customerPhone;
+    if (!phoneToCall) {
+      Alert.alert('Phone Unavailable', 'The customer has not provided a valid phone number on their profile.');
+      return;
+    }
+    Linking.openURL(`tel:${phoneToCall}`);
   };
 
   if (!currentLocation) {

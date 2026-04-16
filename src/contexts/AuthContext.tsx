@@ -9,6 +9,7 @@ type AuthContextType = {
     profile: Profile | null;
     loading: boolean;
     signOut: () => Promise<void>;
+    refreshProfile: () => Promise<void>;
     registrationData: Partial<Profile> & { password?: string };
     updateRegistrationData: (data: Partial<Profile> & { password?: string }) => void;
 };
@@ -57,12 +58,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     useEffect(() => {
+        // Helper to ensure Rider starts offline
+        const forceOfflineAndFetch = async (userId: string) => {
+            try {
+                // Explicitly set offline in the database on app open / login
+                await supabase.from('riders').update({ is_online: false }).eq('id', userId);
+            } catch (e) {
+                console.error('Failed to force offline on startup:', e);
+            }
+            fetchProfile(userId);
+        };
+
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
-                fetchProfile(session.user.id);
+                forceOfflineAndFetch(session.user.id);
             } else {
                 setLoading(false);
             }
@@ -72,11 +84,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
-                fetchProfile(session.user.id);
+                // If they explicitly logged in, force offline again
+                if (event === 'SIGNED_IN') {
+                    forceOfflineAndFetch(session.user.id);
+                } else {
+                    fetchProfile(session.user.id);
+                }
             } else {
                 setProfile(null);
                 setLoading(false);
@@ -161,6 +178,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             profile,
             loading,
             signOut,
+            refreshProfile: () => user ? fetchProfile(user.id) : Promise.resolve(),
             registrationData,
             updateRegistrationData
         }}>

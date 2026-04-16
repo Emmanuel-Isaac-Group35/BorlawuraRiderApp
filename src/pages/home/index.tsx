@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
+import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 import { Toast } from '../../components/common/Toast';
@@ -124,6 +125,35 @@ export default function HomePage() {
     };
   }, [isOnline, user]);
 
+  // Network Connectivity Monitoring
+  useEffect(() => {
+    let wasConnected = true;
+
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const isConnected = state.isConnected;
+
+      if (isConnected === false && isOnline && user) {
+        wasConnected = false;
+        // Network connection lost
+        setIsOnline(false);
+        Alert.alert(
+          'Network Connection Lost',
+          'You have been automatically taken offline because your device lost internet connection.'
+        );
+        // Try updating DB immediately (may fail if completely disconnected)
+        toggleOnlineStatus(user.id, false).catch(e => console.log('Failed to update DB offline state', e));
+      } else if (isConnected === true && !wasConnected && user) {
+        wasConnected = true;
+        // Upon reconnection, sync the offline state clearly to the backend if they remained offline
+        if (!isOnline) {
+          toggleOnlineStatus(user.id, false).catch(e => console.log('Sync offline status failed', e));
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isOnline, user]);
+
   // Focus effect to load stats
   useFocusEffect(
     useCallback(() => {
@@ -141,42 +171,6 @@ export default function HomePage() {
       }
     }
   }, [profile]);
-
-  // AppState listener for auto online/offline
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextAppState) => {
-      if (user) {
-        if (nextAppState === 'active') {
-          // Do nothing, let rider manually choose when to go online
-        } else if (nextAppState === 'background' || nextAppState === 'inactive') {
-          try {
-            await toggleOnlineStatus(user.id, false);
-            setIsOnline(false);
-          } catch (error) {
-            console.error('Error auto-setting offline:', error);
-          }
-        }
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [user]);
-
-  // Initial offline setup
-  useEffect(() => {
-    const initializeOffline = async () => {
-      if (user) {
-        try {
-          await updateOnlineStatus(false);
-        } catch (error) {
-          console.error('Error initializing offline status:', error);
-        }
-      }
-    };
-    initializeOffline();
-  }, [user]);
 
   // Initialize and Watch Maps Location
   useEffect(() => {
@@ -240,6 +234,17 @@ export default function HomePage() {
   // Listen for realtime orders
   useEffect(() => {
     if (!user || !isOnline) return;
+
+    // Secondary Security check: Ensure documents are still present
+    const isVerified = !!profile?.license_photo_url && 
+                       !!profile?.ghana_card_photo_url && 
+                       !!profile?.vehicle_photo_url;
+    
+    if (!isVerified) {
+       // If somehow online but not verified, force offline
+       updateOnlineStatus(false);
+       return;
+    }
 
     const tripsSubscription = supabase
       .channel('new-trip-requests')
@@ -324,6 +329,23 @@ export default function HomePage() {
 
   const handleToggleOnline = () => {
     if (!isOnline) {
+      // Security Check: Ensure rider is verified with documents
+      const isVerified = !!profile?.license_photo_url && 
+                         !!profile?.ghana_card_photo_url && 
+                         !!profile?.vehicle_photo_url;
+
+      if (!isVerified) {
+        Alert.alert(
+          'Verification Required',
+          'Please upload your Rider License, Ghana Card, and Tricycle Registration in the Profile section to start receiving orders.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Update Profile', onPress: () => navigation.navigate('Profile' as any) }
+          ]
+        );
+        return;
+      }
+
       Alert.alert(
         'Go Online',
         'Are you ready to start receiving ride requests?',
@@ -339,18 +361,21 @@ export default function HomePage() {
 
   const updateOnlineStatus = async (status: boolean) => {
     if (!user) return;
+    
+    // Always update visual local state safely
+    setIsOnline(status);
+    if (status) {
+      setShowNotification(true);
+      setTimeout(() => {
+        setShowNotification(false);
+      }, 1500);
+    }
+    
     try {
       await toggleOnlineStatus(user.id, status);
-      setIsOnline(status);
-      if (status) {
-        setShowNotification(true);
-        setTimeout(() => {
-          setShowNotification(false);
-        }, 1500);
-      }
     } catch (error) {
       console.error('Error updating online status:', error);
-      Alert.alert('Error', 'Failed to update status');
+      // Soft fail, user may be offline
     }
   };
 

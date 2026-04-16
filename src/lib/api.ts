@@ -16,6 +16,8 @@ const mapTrip = (trip: any) => ({
     time: new Date(trip.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     rating: trip.rating || 0,
     status: trip.status,
+    pickupType: trip.pickup_time ? 'Scheduled' : 'Instant',
+    pickupTime: trip.pickup_time,
 });
 
 
@@ -114,15 +116,17 @@ export const fetchStats = async (userId: string) => {
     const totalTrips = tripsHandle?.length || 0;
 
 
-    // Acceptance rate logic
-    const { count: totalHandled } = await supabase
-        .from('orders')
+    // Acceptance rate logic using accurate metrics
+    const { count: totalDeclined } = await supabase
+        .from('audit_logs')
         .select('*', { count: 'exact', head: true })
-        .eq('rider_id', userId)
-        .in('status', ['completed', 'cancelled']);
+        .eq('user_id', userId)
+        .eq('action', 'request_declined');
 
-    const acceptanceRate = (totalHandled && totalHandled > 0) 
-        ? Math.round((totalTrips / totalHandled) * 100) 
+    const totalOffered = totalTrips + (totalDeclined || 0);
+
+    const acceptanceRate = totalOffered > 0 
+        ? Math.round((totalTrips / totalOffered) * 100) 
         : 100;
 
     return {

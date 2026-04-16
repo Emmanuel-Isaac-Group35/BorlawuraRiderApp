@@ -26,7 +26,8 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type FilterType = 'all' | 'today' | 'week' | 'month';
+type DateFilterType = 'all' | 'today' | 'week' | 'month';
+type PickupFilterType = 'all' | 'instant' | 'scheduled';
 
 interface Trip {
   id: string;
@@ -39,11 +40,14 @@ interface Trip {
   time: string;
   rating: number;
   status: 'completed';
+  pickupType?: 'Instant' | 'Scheduled';
+  pickupTime?: string | null;
 }
 
 export default function TripsPage() {
   const navigation = useNavigation<NavigationProp>();
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [activeDateFilter, setActiveDateFilter] = useState<DateFilterType>('all');
+  const [activeTypeFilter, setActiveTypeFilter] = useState<PickupFilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
@@ -89,23 +93,29 @@ export default function TripsPage() {
     // Ensure we only show trips with 'completed' status
     let filtered = allTrips.filter(trip => trip.status === 'completed');
 
-    if (activeFilter === 'today') {
+    if (activeDateFilter === 'today') {
       filtered = filtered.filter(trip => trip.date === todayStr);
-    } else if (activeFilter === 'week') {
+    } else if (activeDateFilter === 'week') {
       const weekAgo = new Date(today);
       weekAgo.setDate(weekAgo.getDate() - 7);
       filtered = filtered.filter(trip => new Date(trip.date) >= weekAgo);
-    } else if (activeFilter === 'month') {
+    } else if (activeDateFilter === 'month') {
       const monthAgo = new Date(today);
       monthAgo.setMonth(monthAgo.getMonth() - 1);
       filtered = filtered.filter(trip => new Date(trip.date) >= monthAgo);
     }
 
+    if (activeTypeFilter === 'instant') {
+      filtered = filtered.filter(trip => trip.pickupType === 'Instant');
+    } else if (activeTypeFilter === 'scheduled') {
+      filtered = filtered.filter(trip => trip.pickupType === 'Scheduled');
+    }
+
     if (searchQuery) {
       filtered = filtered.filter(trip =>
-        trip.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.wasteType.toLowerCase().includes(searchQuery.toLowerCase())
+        (trip.customerName && trip.customerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (trip.pickupLocation && trip.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (trip.wasteType && trip.wasteType.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
     return filtered;
@@ -137,8 +147,15 @@ export default function TripsPage() {
                <Text style={styles.tripDate}>{formatDate(item.date)}, {item.time}</Text>
              </View>
           </View>
-          <View style={styles.badgeWrapper}>
-            <Text style={styles.wasteBadgeText}>{item.wasteType}</Text>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <View style={[styles.badgeWrapper, item.pickupType === 'Scheduled' && styles.scheduledBadge]}>
+              <Text style={[styles.wasteBadgeText, item.pickupType === 'Scheduled' && styles.scheduledBadgeText]}>
+                {item.pickupType === 'Scheduled' ? '📅 Scheduled' : '⚡ Instant'}
+              </Text>
+            </View>
+            <View style={styles.badgeWrapper}>
+              <Text style={styles.wasteBadgeText}>{item.wasteType}</Text>
+            </View>
           </View>
         </View>
 
@@ -164,7 +181,12 @@ export default function TripsPage() {
     );
   };
 
-  const filters: FilterType[] = ['all', 'today', 'week', 'month'];
+  const dateFilters: DateFilterType[] = ['all', 'today', 'week', 'month'];
+  const typeFilters: { id: PickupFilterType; label: string }[] = [
+    { id: 'all', label: 'All Pickups' },
+    { id: 'instant', label: '⚡ Instant' },
+    { id: 'scheduled', label: '📅 Scheduled' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -197,17 +219,32 @@ export default function TripsPage() {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 80 }}>
-        {/* Pills */}
+      <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
+        {/* Type Filter Pills */}
         <View style={styles.filterPills}>
-          {filters.map((f) => (
+          {typeFilters.map((f) => (
+            <TouchableOpacity
+              key={f.id}
+              onPress={() => setActiveTypeFilter(f.id)}
+              style={[styles.pillBtn, activeTypeFilter === f.id && styles.pillBtnActive]}
+            >
+              <Text style={[styles.pillText, activeTypeFilter === f.id && styles.pillTextActive]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Date Filter Pills */}
+        <View style={styles.filterPills}>
+          {dateFilters.map((f) => (
             <TouchableOpacity
               key={f}
-              onPress={() => setActiveFilter(f)}
-              style={[styles.pillBtn, activeFilter === f && styles.pillBtnActive]}
+              onPress={() => setActiveDateFilter(f)}
+              style={[styles.pillBtn, activeDateFilter === f && styles.pillBtnActive]}
             >
-              <Text style={[styles.pillText, activeFilter === f && styles.pillTextActive]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+              <Text style={[styles.pillText, activeDateFilter === f && styles.pillTextActive]}>
+                {f === 'all' ? 'All Time' : f.charAt(0).toUpperCase() + f.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -378,6 +415,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#4B5563',
+  },
+  scheduledBadge: {
+    backgroundColor: '#EEF2FF', // light indigo
+    borderColor: '#C7D2FE',
+    borderWidth: 1,
+  },
+  scheduledBadgeText: {
+    color: '#4F46E5', // indigo
   },
   routeContainer: {
     flexDirection: 'row',
