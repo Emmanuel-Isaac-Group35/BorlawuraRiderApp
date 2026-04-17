@@ -38,7 +38,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function HomePage() {
   const navigation = useNavigation<NavigationProp>();
-  const { profile, user } = useAuth();
+  const { profile, user, settings } = useAuth();
   const [stats, setStats] = useState({
     todayEarnings: 0,
     weeklyEarnings: 0,
@@ -255,11 +255,11 @@ export default function HomePage() {
           schema: 'public',
           table: 'orders',
         },
-        async (payload) => {
+        async (payload: any) => {
           const isRequestedForOtherRider = payload.new.rider_id && payload.new.rider_id !== user.id;
 
           if (payload.new.status === 'pending' && isOnline && !isRequestedForOtherRider) {
-            let enrichedTrip = { ...payload.new };
+            const enrichedTrip = { ...payload.new };
             const tripId = payload.new.user_id || payload.new.userId || payload.new.customer_id;
             
             const existingName = payload.new.customer_name || payload.new.customerName || 
@@ -270,25 +270,25 @@ export default function HomePage() {
 
             if (tripId && (!existingName || existingName === 'Customer')) {
               try {
-                let { data: profile, error } = await supabase
+                let { data: profile_data, error: profile_error } = await supabase
                   .from('profiles')
                   .select('full_name, first_name, last_name, email')
                   .eq('id', tripId)
                   .maybeSingle();
                 
-                if (!profile || error?.code === '42P01') {
+                if (!profile_data || profile_error?.code === '42P01') {
                    const { data: riderProfile } = await supabase
                     .from('riders')
                     .select('first_name, last_name, email')
                     .eq('id', tripId)
                     .maybeSingle();
-                   if (riderProfile) profile = { ...riderProfile, full_name: null } as any;
+                   if (riderProfile) profile_data = { ...riderProfile, full_name: null } as any;
                 }
 
-                if (profile) {
-                  const resolvedName = profile.full_name || 
-                                              (profile.first_name ? (`${profile.first_name} ${profile.last_name || ''}`).trim() : 
-                                              (profile.email?.split('@')[0] || 'Customer'));
+                if (profile_data) {
+                  const resolvedName = (profile_data as any).full_name || 
+                                              ((profile_data as any).first_name ? (`${(profile_data as any).first_name} ${(profile_data as any).last_name || ''}`).trim() : 
+                                              ((profile_data as any).email?.split('@')[0] || 'Customer'));
                   enrichedTrip.customer_name = resolvedName;
 
                   await supabase
@@ -303,10 +303,31 @@ export default function HomePage() {
                enrichedTrip.customer_name = existingName;
             }
 
-            setShowNotification(true);
-            setTimeout(() => {
-              navigation.navigate('Request', { trip: enrichedTrip });
-            }, 1000);
+            // Auto-Accept Logic
+            if (settings.autoAccept) {
+               try {
+                 await supabase
+                   .from('orders')
+                   .update({ 
+                     rider_id: user.id, 
+                     status: 'accepted',
+                     accepted_at: new Date().toISOString() 
+                   })
+                   .eq('id', payload.new.id);
+                 
+                 navigation.navigate('Tracking', { trip: enrichedTrip });
+                 return;
+               } catch (e) {
+                 console.error('Auto-accept failed:', e);
+               }
+            }
+
+            if (settings.pushNotifications) {
+              setShowNotification(true);
+              setTimeout(() => {
+                navigation.navigate('Request', { trip: enrichedTrip });
+              }, 1000);
+            }
           }
         }
       )

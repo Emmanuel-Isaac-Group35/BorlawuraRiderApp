@@ -36,17 +36,14 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ProfilePage() {
   const navigation = useNavigation<NavigationProp>();
-  const { signOut, profile, user, refreshProfile } = useAuth();
+  const { signOut, profile, user, refreshProfile, settings, updateSettings } = useAuth();
   const [stats, setStats] = useState({ totalTrips: 0, rating: 5.0 });
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
-
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [soundAlerts, setSoundAlerts] = useState(true);
-  const [autoAccept, setAutoAccept] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,6 +52,20 @@ export default function ProfilePage() {
       }
     }, [user?.id, profile?.rating])
   );
+
+  const handleTogglePush = async (value: boolean) => {
+    await updateSettings('pushNotifications', value);
+    if (value) {
+      Alert.alert('Notifications Enabled', 'You will now receive alerts for new pickup requests.');
+    }
+  };
+
+  const handleToggleAutoAccept = async (value: boolean) => {
+    await updateSettings('autoAccept', value);
+    if (value) {
+      Alert.alert('Auto-Accept Active', 'The app will now automatically accept requests within 2km.');
+    }
+  };
 
   const loadRiderStats = async () => {
      try {
@@ -74,12 +85,22 @@ export default function ProfilePage() {
   };
 
   const [editForm, setEditForm] = useState({
-    name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : riderProfile.name,
-    phone: profile?.phone || riderProfile.phone,
-    email: profile?.email || riderProfile.email
+    name: '',
+    phone: '',
+    email: ''
   });
 
-  const handleSaveProfile = () => {
+  // Sync edit form with profile data when modal opens
+  const handleOpenEditModal = () => {
+    setEditForm({
+      name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : '',
+      phone: profile?.phone || '',
+      email: profile?.email || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveProfile = async () => {
     if (!editForm.name || editForm.name.trim().length < 2) {
       Alert.alert('Error', 'Please enter a valid name (at least 2 characters)');
       return;
@@ -95,8 +116,37 @@ export default function ProfilePage() {
         return;
       }
     }
-    setShowEditModal(false);
-    Alert.alert('Success', 'Profile updated successfully!');
+
+    setSaving(true);
+    try {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const nameParts = editForm.name.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+      const { error } = await supabase
+        .from('riders')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          full_name: editForm.name.trim(),
+          phone: editForm.phone.trim(),
+          email: editForm.email.trim()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      await refreshProfile();
+      setShowEditModal(false);
+      Alert.alert('Success', 'Profile updated successfully!');
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      Alert.alert('Update Failed', error.message || 'An error occurred while saving your profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -209,7 +259,7 @@ export default function ProfilePage() {
           <Text style={styles.heroName}>{displayName}</Text>
           <Text style={styles.heroPhone}>{displayPhone}</Text>
           
-          <TouchableOpacity onPress={() => setShowEditModal(true)} style={styles.editInfoBtn}>
+          <TouchableOpacity onPress={handleOpenEditModal} style={styles.editInfoBtn}>
              <Ionicons name="create-outline" size={14} color={colors.primary} />
              <Text style={styles.editInfoBtnText}>Edit Profile</Text>
           </TouchableOpacity>
@@ -277,9 +327,9 @@ export default function ProfilePage() {
                 <Text style={styles.moduleSubLabel}>Alerts for new bookings</Text>
               </View>
             </View>
-            <Switch value={pushNotifications} onValueChange={setPushNotifications} trackColor={{ false: colors.gray[200], true: colors.primary }} />
+            <Switch value={settings.pushNotifications} onValueChange={handleTogglePush} trackColor={{ false: colors.gray[200], true: colors.primary }} />
           </View>
-
+ 
           <View style={styles.moduleRow}>
             <View style={styles.moduleRowLeft}>
               <View style={[styles.moduleIconBox, { backgroundColor: '#E0E7FF' }]}>
@@ -290,7 +340,7 @@ export default function ProfilePage() {
                 <Text style={styles.moduleSubLabel}>Chimes during requests</Text>
               </View>
             </View>
-            <Switch value={soundAlerts} onValueChange={setSoundAlerts} trackColor={{ false: colors.gray[200], true: colors.primary }} />
+            <Switch value={settings.soundAlerts} onValueChange={(v) => updateSettings('soundAlerts', v)} trackColor={{ false: colors.gray[200], true: colors.primary }} />
           </View>
           
           <View style={[styles.moduleRow, styles.noBorder]}>
@@ -303,21 +353,12 @@ export default function ProfilePage() {
                 <Text style={styles.moduleSubLabel}>Automatically accept near trips</Text>
               </View>
             </View>
-            <Switch value={autoAccept} onValueChange={setAutoAccept} trackColor={{ false: colors.gray[200], true: colors.primary }} />
+            <Switch value={settings.autoAccept} onValueChange={handleToggleAutoAccept} trackColor={{ false: colors.gray[200], true: colors.primary }} />
           </View>
         </View>
 
         <Text style={styles.sectionHeader}>SUPPORT & SECURITY</Text>
         <View style={[styles.moduleBlock, { paddingVertical: 8 }]}>
-           <TouchableOpacity 
-             style={styles.simpleRow}
-             onPress={() => navigation.navigate('AuditLogs')}
-             activeOpacity={0.7}
-           >
-              <Text style={styles.simpleRowLabel}>Audit Logs</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.gray[300]} />
-           </TouchableOpacity>
-           <View style={styles.divider} />
            <TouchableOpacity 
              style={styles.simpleRow}
              onPress={() => navigation.navigate('Support')}
@@ -372,7 +413,17 @@ export default function ProfilePage() {
             <TextInput style={styles.inputField} value={editForm.email || ''} keyboardType="email-address" onChangeText={t => setEditForm({...editForm, email: t})} />
           </View>
         </View>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.saveBtn, saving && { opacity: 0.7 }]} 
+          onPress={handleSaveProfile}
+          disabled={saving}
+        >
+          {saving ? (
+            <RNActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Text style={styles.saveBtnText}>Save</Text>
+          )}
+        </TouchableOpacity>
       </Modal>
 
       {/* Terms & Conditions Modal */}

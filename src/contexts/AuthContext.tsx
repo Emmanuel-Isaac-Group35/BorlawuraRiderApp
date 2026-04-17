@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types/supabase';
 
@@ -12,6 +13,12 @@ type AuthContextType = {
     refreshProfile: () => Promise<void>;
     registrationData: Partial<Profile> & { password?: string };
     updateRegistrationData: (data: Partial<Profile> & { password?: string }) => void;
+    settings: {
+        pushNotifications: boolean;
+        soundAlerts: boolean;
+        autoAccept: boolean;
+    };
+    updateSettings: (key: 'pushNotifications' | 'soundAlerts' | 'autoAccept', value: boolean) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -34,6 +41,12 @@ const AuthContext = createContext<AuthContextType>({
         vehicle_photo_url: ''
     },
     updateRegistrationData: () => { },
+    settings: {
+        pushNotifications: true,
+        soundAlerts: true,
+        autoAccept: false
+    },
+    updateSettings: async () => { }
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -56,6 +69,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         ghana_card_photo_url: '',
         vehicle_photo_url: ''
     });
+
+    const [settings, setSettings] = useState({
+        pushNotifications: true,
+        soundAlerts: true,
+        autoAccept: false
+    });
+
+    useEffect(() => {
+        loadSettings();
+    }, []);
+
+    const loadSettings = async () => {
+        try {
+            const pn = await AsyncStorage.getItem('pushNotifications');
+            const sa = await AsyncStorage.getItem('soundAlerts');
+            const aa = await AsyncStorage.getItem('autoAccept');
+
+            setSettings({
+                pushNotifications: pn !== null ? pn === 'true' : true,
+                soundAlerts: sa !== null ? sa === 'true' : true,
+                autoAccept: aa !== null ? aa === 'true' : false
+            });
+        } catch (e) {
+            console.error('Failed to load settings:', e);
+        }
+    };
+
+    const updateSettings = async (key: 'pushNotifications' | 'soundAlerts' | 'autoAccept', value: boolean) => {
+        try {
+            setSettings(prev => ({ ...prev, [key]: value }));
+            await AsyncStorage.setItem(key, value.toString());
+        } catch (e) {
+            console.error('Failed to save setting:', e);
+        }
+    };
 
     useEffect(() => {
         // Helper to ensure Rider starts offline
@@ -180,7 +228,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             signOut,
             refreshProfile: () => user ? fetchProfile(user.id) : Promise.resolve(),
             registrationData,
-            updateRegistrationData
+            updateRegistrationData,
+            settings,
+            updateSettings
         }}>
             {children}
         </AuthContext.Provider>
