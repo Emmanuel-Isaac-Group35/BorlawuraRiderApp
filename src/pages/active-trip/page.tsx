@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 type TripStatus = 'driving_to_pickup' | 'arrived_at_pickup' | 'waste_collected' | 'driving_to_disposal' | 'arrived_at_disposal';
@@ -10,6 +10,23 @@ export default function ActiveTripPage() {
   const [showDisposalSites, setShowDisposalSites] = useState(false);
   const [showSiteNotification, setShowSiteNotification] = useState(false);
   const [selectedSite, setSelectedSite] = useState('');
+  const [riderCoords, setRiderCoords] = useState<{lat: number, lng: number} | null>(null);
+
+  useEffect(() => {
+    // Pick the actual live location of the rider
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setRiderCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => console.warn('Could not fetch rider location: ', error),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  }, []);
 
   const tripData = {
     customerName: 'Kwame Mensah',
@@ -74,7 +91,7 @@ export default function ActiveTripPage() {
   };
 
   const handleNavigate = () => {
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${tripData.pickupCoordinates.lat},${tripData.pickupCoordinates.lng}`, '_blank');
+    window.open(`https://www.google.com/maps/dir/?api=1&origin=${riderCoords ? `${riderCoords.lat},${riderCoords.lng}` : '5.6037,-0.1870'}&destination=${tripData.pickupCoordinates.lat},${tripData.pickupCoordinates.lng}`, '_blank');
   };
 
   const handleDisposalSiteSelect = (site: typeof disposalSites[0]) => {
@@ -207,6 +224,20 @@ export default function ActiveTripPage() {
               <p className="text-xs text-gray-500 mb-1">Waste Type</p>
               <p className="font-semibold text-gray-800">{tripData.wasteType}</p>
             </div>
+          </div>
+        </div>
+
+        {/* Map Preview Traceable Path */}
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden mb-4">
+          <div className="h-64 bg-gray-200 relative">
+            <iframe
+              src={`https://www.google.com/maps/embed/v1/directions?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&origin=${riderCoords ? `${riderCoords.lat},${riderCoords.lng}` : '5.6037,-0.1870'}&destination=${tripData.pickupCoordinates.lat},${tripData.pickupCoordinates.lng}&mode=driving`}
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              loading="lazy"
+              allowFullScreen={true}
+            ></iframe>
           </div>
         </div>
 

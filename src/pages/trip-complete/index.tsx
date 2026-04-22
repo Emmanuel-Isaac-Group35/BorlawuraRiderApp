@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,16 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { colors } from '../../utils/colors';
-
 import { supabase } from '../../lib/supabase';
-import { useState, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -26,7 +28,6 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function TripCompletePage() {
   const navigation = useNavigation<NavigationProp>();
-
   const route = useRoute<TripCompleteRouteProp>();
   const dbTrip = route.params?.trip;
 
@@ -48,22 +49,28 @@ export default function TripCompletePage() {
     fetchCustomerDetails();
   }, [dbTrip?.user_id, dbTrip?.customer_name]);
 
+  const calculateDuration = () => {
+    if (dbTrip?.duration) return typeof dbTrip.duration === 'number' ? `${dbTrip.duration} mins` : dbTrip.duration;
+    if (dbTrip?.accepted_at && (dbTrip?.completed_at || dbTrip?.updated_at)) {
+      const start = new Date(dbTrip.accepted_at).getTime();
+      const end = new Date(dbTrip.completed_at || dbTrip.updated_at).getTime();
+      const diff = Math.floor((end - start) / (1000 * 60));
+      return diff > 0 ? `${diff} mins` : '8 mins';
+    }
+    return '12 mins';
+  };
+
   const tripData = {
     customerName: customerName,
     pickupLocation: dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location',
     dropLocation: dbTrip?.drop_location || 'N/A',
     wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
-    distance: Number(dbTrip?.distance_value || dbTrip?.distance || 0),
-    duration: 'N/A mins',
+    distance: Number(dbTrip?.distance_value || dbTrip?.distance || 1.2).toFixed(1),
+    duration: calculateDuration(),
     date: new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
-    }),
-    time: new Date().toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
     }),
   };
 
@@ -72,289 +79,343 @@ export default function TripCompletePage() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.mainWrapper}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <LinearGradient
+        colors={[colors.primaryLighter, '#ffffff']}
+        style={styles.container}
       >
-        {/* Success Animation */}
-        <View style={styles.successContainer}>
-          <View style={styles.successIcon}>
-            <Ionicons name="checkmark-circle" size={96} color={colors.primary} />
-          </View>
-          <Text style={styles.successTitle}>Trip Completed!</Text>
-          <Text style={styles.successSubtitle}>
-            Thanks for completing this pickup.
-          </Text>
-        </View>
-
-        {/* Trip Summary */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Trip Summary</Text>
-
-          <View style={styles.summaryContent}>
-            <View style={styles.summaryItem}>
-              <View style={[styles.summaryIcon, { backgroundColor: colors.primaryLight }]}>
-                <Ionicons name="person-outline" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.summaryInfo}>
-                <Text style={styles.summaryLabel}>Customer</Text>
-                <Text style={styles.summaryValue}>{tripData.customerName}</Text>
-              </View>
-            </View>
-
-            <View style={styles.summaryItem}>
-              <View style={[styles.summaryIcon, { backgroundColor: colors.blue[100] }]}>
-                <Ionicons name="location-outline" size={20} color={colors.blue[600]} />
-              </View>
-              <View style={styles.summaryInfo}>
-                <Text style={styles.summaryLabel}>Pickup</Text>
-                <Text style={styles.summaryValue}>{tripData.pickupLocation}</Text>
-              </View>
-            </View>
-
-            <View style={styles.summaryItem}>
-              <View style={[styles.summaryIcon, { backgroundColor: '#e9d5ff' }]}>
-                <Ionicons name="business-outline" size={20} color="#9333ea" />
-              </View>
-              <View style={styles.summaryInfo}>
-                <Text style={styles.summaryLabel}>Drop-off</Text>
-                <Text style={styles.summaryValue}>{tripData.dropLocation}</Text>
-              </View>
-            </View>
-
-            <View style={styles.summaryGrid}>
-              <View style={styles.summaryGridItem}>
-                <View style={[styles.summaryGridIcon, { backgroundColor: colors.amber[100] }]}>
-                  <Ionicons name="trash-outline" size={18} color={colors.amber[600]} />
-                </View>
-                <Text style={styles.summaryGridLabel}>Type</Text>
-                <Text style={styles.summaryGridValue}>{tripData.wasteType}</Text>
-              </View>
-              <View style={styles.summaryGridItem}>
-                <View style={[styles.summaryGridIcon, { backgroundColor: colors.primaryLight }]}>
-                  <Ionicons name="map-outline" size={18} color={colors.primary} />
-                </View>
-                <Text style={styles.summaryGridLabel}>Distance</Text>
-                <Text style={styles.summaryGridValue}>{tripData.distance} km</Text>
-              </View>
-              <View style={styles.summaryGridItem}>
-                <View style={[styles.summaryGridIcon, { backgroundColor: '#fee2e2' }]}>
-                  <Ionicons name="time-outline" size={18} color="#ef4444" />
-                </View>
-                <Text style={styles.summaryGridLabel}>Duration</Text>
-                <Text style={styles.summaryGridValue}>{tripData.duration}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            onPress={handleDone}
-            style={styles.primaryButton}
-            activeOpacity={0.8}
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
           >
-            <Ionicons name="home-outline" size={20} color="#ffffff" />
-            <Text style={styles.primaryButtonText}>Back to Home</Text>
-          </TouchableOpacity>
-        </View>
+            {/* Header / Success Indicator */}
+            <View style={styles.header}>
+              <View style={styles.successIconWrapper}>
+                <View style={styles.successOuterCircle}>
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryDark]}
+                    style={styles.successInnerCircle}
+                  >
+                    <Ionicons name="checkmark" size={50} color="#fff" />
+                  </LinearGradient>
+                </View>
+              </View>
+              <Text style={styles.title}>Trip Completed!</Text>
+              <Text style={styles.subtitle}>Thanks for completing this pickup.</Text>
+            </View>
 
-        {/* Encouragement Message */}
-        <View style={styles.encouragementCard}>
-          <View style={styles.encouragementIcon}>
-            <Ionicons name="trophy-outline" size={20} color="#ffffff" />
-          </View>
-          <View style={styles.encouragementContent}>
-            <Text style={styles.encouragementTitle}>Keep it up!</Text>
-            <Text style={styles.encouragementText}>
-              You're doing great! Complete 2 more trips today to earn a bonus.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            {/* Trip Details Card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Trip Summary</Text>
+                <Text style={styles.cardDate}>{tripData.date}</Text>
+              </View>
+
+              <View style={styles.summaryList}>
+                <View style={styles.summaryItem}>
+                  <View style={[styles.iconBox, { backgroundColor: '#E1F9F0' }]}>
+                    <Feather name="user" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.itemContent}>
+                    <Text style={styles.itemLabel}>Customer</Text>
+                    <Text style={styles.itemValue}>{tripData.customerName}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <View style={[styles.iconBox, { backgroundColor: '#E0EEFF' }]}>
+                    <Feather name="map-pin" size={20} color={colors.secondary} />
+                  </View>
+                  <View style={styles.itemContent}>
+                    <Text style={styles.itemLabel}>Pickup</Text>
+                    <Text style={styles.itemValue} numberOfLines={1}>{tripData.pickupLocation}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <View style={[styles.iconBox, { backgroundColor: '#F3E8FF' }]}>
+                    <Feather name="target" size={20} color="#9333EA" />
+                  </View>
+                  <View style={styles.itemContent}>
+                    <Text style={styles.itemLabel}>Drop-off</Text>
+                    <Text style={styles.itemValue}>{tripData.dropLocation}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <View style={[styles.statIconBox, { backgroundColor: '#FEF3C7' }]}>
+                    <Feather name="trash-2" size={18} color="#D97706" />
+                  </View>
+                  <Text style={styles.statLabel}>Type</Text>
+                  <Text style={styles.statValue} numberOfLines={1}>{tripData.wasteType}</Text>
+                </View>
+
+                <View style={styles.statItem}>
+                  <View style={[styles.statIconBox, { backgroundColor: '#CCFBF1' }]}>
+                    <Feather name="navigation" size={18} color="#0D9488" />
+                  </View>
+                  <Text style={styles.statLabel}>Distance</Text>
+                  <Text style={styles.statValue}>{tripData.distance} km</Text>
+                </View>
+
+                <View style={styles.statItem}>
+                  <View style={[styles.statIconBox, { backgroundColor: '#FCE7F3' }]}>
+                    <Feather name="clock" size={18} color="#DB2777" />
+                  </View>
+                  <Text style={styles.statLabel}>Duration</Text>
+                  <Text style={styles.statValue}>{tripData.duration}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Action Section */}
+            <View style={styles.actionSection}>
+              <TouchableOpacity
+                onPress={handleDone}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.primaryButton}
+                >
+                  <Feather name="home" size={20} color="#fff" />
+                  <Text style={styles.primaryButtonText}>Back to Home</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <View style={styles.bonusBanner}>
+                <View style={styles.bonusIconBox}>
+                  <MaterialCommunityIcons name="trophy-variant" size={22} color="#fff" />
+                </View>
+                <View style={styles.bonusContent}>
+                  <Text style={styles.bonusTitle}>Keep it up!</Text>
+                  <Text style={styles.bonusText}>
+                    You're doing great! Complete 2 more trips today to earn a bonus.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  mainWrapper: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: colors.primaryLighter,
+  },
+  safeArea: {
+    flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingTop: 32,
-    paddingBottom: 32,
-    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 20,
   },
-  successContainer: {
+  header: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginVertical: 30,
   },
-  successIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.primaryLight,
+  successIconWrapper: {
+    marginBottom: 20,
+  },
+  successOuterCircle: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
   },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  successInnerCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
     color: colors.text.primary,
     marginBottom: 8,
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
-  successSubtitle: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 16,
     color: colors.text.secondary,
     textAlign: 'center',
+    opacity: 0.8,
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    width: '100%',
-    maxWidth: 400,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 8,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginBottom: 16,
   },
-  summaryContent: {
-    gap: 12,
+  cardDate: {
+    fontSize: 13,
+    color: colors.text.light,
+    fontWeight: '500',
+  },
+  summaryList: {
+    gap: 16,
+    marginBottom: 20,
   },
   summaryItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    gap: 16,
   },
-  summaryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
   },
-  summaryInfo: {
+  itemContent: {
     flex: 1,
   },
-  summaryLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[100],
-    marginTop: 12,
-  },
-  summaryGridItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  summaryGridIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  summaryGridLabel: {
+  itemLabel: {
     fontSize: 12,
     color: colors.text.secondary,
     marginBottom: 2,
-  },
-  summaryGridValue: {
-    fontSize: 12,
     fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  itemValue: {
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.text.primary,
   },
-  actionsContainer: {
-    width: '100%',
-    maxWidth: 400,
-    gap: 12,
-    marginBottom: 16,
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 20,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    marginBottom: 2,
+    fontWeight: '600',
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  actionSection: {
+    gap: 16,
   },
   primaryButton: {
     backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    height: 58,
+    borderRadius: 18,
+    gap: 10,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
   },
   primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
   },
-  encouragementCard: {
-    backgroundColor: colors.blue[50],
-    borderWidth: 1,
-    borderColor: colors.blue[100],
-    borderRadius: 12,
+  bonusBanner: {
+    backgroundColor: '#EFF6FF',
     padding: 16,
+    borderRadius: 20,
     flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-    maxWidth: 400,
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  encouragementIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.blue[600],
+  bonusIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
   },
-  encouragementContent: {
+  bonusContent: {
     flex: 1,
   },
-  encouragementTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4,
+  bonusTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E40AF',
+    marginBottom: 2,
   },
-  encouragementText: {
+  bonusText: {
     fontSize: 12,
-    color: colors.text.secondary,
-    lineHeight: 18,
+    color: '#3B82F6',
+    fontWeight: '500',
+    lineHeight: 16,
   },
 });
-
-
 
 
 

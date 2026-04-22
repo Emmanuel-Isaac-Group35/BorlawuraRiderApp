@@ -18,7 +18,7 @@ import { colors } from '../../utils/colors';
 import { supabase } from '../../lib/supabase';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useOpenRouteDirections } from '../../hooks/useOpenRouteDirections';
+import { useNavigatrDirections } from '../../hooks/useNavigatrDirections';
 
 const { width, height } = Dimensions.get('window');
 const ROUTE_BLUE = '#1A73E8';
@@ -88,7 +88,7 @@ export default function ActiveTripPage() {
     coordinates: routeCoordinates,
     summary: routeSummary,
     loading: routeLoading,
-  } = useOpenRouteDirections(routeOrigin, routeDestination, 750);
+  } = useNavigatrDirections(routeOrigin, routeDestination, 750);
 
   useEffect(() => {
     if (routeSummary) {
@@ -98,6 +98,24 @@ export default function ActiveTripPage() {
     }
   }, [routeSummary]);
 
+  // Proximity Geofencing: Auto-notify user when rider is within 50 meters
+  useEffect(() => {
+    if (currentStatus === 'driving_to_pickup' && routeInfo?.distance !== undefined) {
+      if (routeInfo.distance <= 0.05) {
+        // Automatically arrive when extremely close
+        setCurrentStatus('arrived_at_pickup');
+        if (dbTrip?.id) {
+          supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id).then(() => {
+            Alert.alert(
+              "Customer Notified",
+              "You have reached the pickup location! The customer has been automatically notified that you arrived."
+            );
+          }).catch(err => console.error("Auto-arrival failed:", err));
+        }
+      }
+    }
+  }, [routeInfo?.distance, currentStatus, dbTrip?.id]);
+
   useEffect(() => {
     if (!routeCoordinates?.length || routeCoordinates.length < 2 || !mapRef.current) return;
     mapRef.current.fitToCoordinates(routeCoordinates, {
@@ -105,6 +123,17 @@ export default function ActiveTripPage() {
       animated: true,
     });
   }, [routeCoordinates]);
+
+  const fitBoth = () => {
+    if (!currentLocation || !mapRef.current) return;
+    mapRef.current.fitToCoordinates([
+      { latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude },
+      { latitude: destination.lat, longitude: destination.lng }
+    ], {
+      edgePadding: { top: 120, right: 40, bottom: 220, left: 40 },
+      animated: true,
+    });
+  };
 
   useEffect(() => {
     // Name and Phone fetching logic
@@ -195,9 +224,6 @@ export default function ActiveTripPage() {
   const handleAction = async () => {
     if (currentStatus === 'accept_to_tracking') {
       setCurrentStatus('driving_to_pickup');
-      // Optionally open real turn-by-turn navigation in Google Maps App
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`;
-      Linking.openURL(url).catch(() => {});
     } else if (currentStatus === 'driving_to_pickup') {
       setCurrentStatus('arrived_at_pickup');
       if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id);
@@ -249,42 +275,80 @@ export default function ActiveTripPage() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         customMapStyle={mapStyle}
+        provider={PROVIDER_GOOGLE}
+        mapType="hybrid"
         initialRegion={{
           latitude: currentLocation.coords.latitude,
           longitude: currentLocation.coords.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
+        onLongPress={(e) => {
+          setCurrentLocation({
+            ...currentLocation,
+            coords: {
+              ...currentLocation.coords,
+              latitude: e.nativeEvent.coordinate.latitude,
+              longitude: e.nativeEvent.coordinate.longitude
+            }
+          });
+        }}
         showsUserLocation={false} 
         showsMyLocationButton={false}
         showsCompass={false}
+        toolbarEnabled={false}
       >
         {/* Rider marker */}
-        <Marker coordinate={{ latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude }} zIndex={10}>
-          <View style={styles.riderMarker}>
-            <View style={styles.riderMarkerInner}>
-              <Ionicons name="car" size={18} color="#fff" />
+        <Marker coordinate={{ latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude }} anchor={{ x: 0.5, y: 1 }} zIndex={10}>
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Rider</Text>
+            </View>
+            <View style={styles.riderMarker}>
+              <View style={styles.riderMarkerInner}>
+                <Ionicons name="car" size={18} color="#fff" />
+              </View>
             </View>
           </View>
         </Marker>
 
         {/* Destination marker */}
-        <Marker coordinate={{ latitude: destination.lat, longitude: destination.lng }} zIndex={5}>
-          <View style={styles.destMarker}>
-             <Ionicons name="location" size={24} color={colors.primary} />
+        <Marker coordinate={{ latitude: destination.lat, longitude: destination.lng }} anchor={{ x: 0.5, y: 1 }} zIndex={5}>
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ backgroundColor: '#1A73E8', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Customer</Text>
+            </View>
+            <View style={styles.destMarker}>
+               <Ionicons name="location" size={24} color={colors.primary} />
+            </View>
           </View>
         </Marker>
 
         {routeCoordinates && routeCoordinates.length >= 2 ? (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor={ROUTE_BLUE}
-            strokeWidth={6}
-            lineCap="round"
-            lineJoin="round"
-          />
+          <>
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor="#000000"
+              strokeWidth={9}
+              lineCap="square"
+              lineJoin="miter"
+            />
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor="#3b00ff"
+              strokeWidth={6}
+              lineCap="square"
+              lineJoin="miter"
+            />
+            <Marker coordinate={routeCoordinates[Math.floor(routeCoordinates.length / 2)]} zIndex={15}>
+              <View style={{ backgroundColor: '#0022cc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#fff' }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                  {routeSummary?.durationMin ? `${routeSummary.durationMin} min` : '1 min'}
+                </Text>
+              </View>
+            </Marker>
+          </>
         ) : !routeLoading ? (
           <Polyline
             coordinates={[
@@ -311,13 +375,6 @@ export default function ActiveTripPage() {
             <Text style={styles.headerTitle} numberOfLines={1}>{pickupAddress}</Text>
             <Text style={styles.headerSubtitle}>{customerName}</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Tracking', { trip: dbTrip })}
-            style={styles.iconButton}
-            accessibilityLabel="Open live tracking map"
-          >
-            <Ionicons name="map-outline" size={22} color={colors.primary} />
-          </TouchableOpacity>
           <TouchableOpacity onPress={handleCall} style={styles.iconButton}>
             <Ionicons name="call" size={22} color={colors.primary} />
           </TouchableOpacity>
@@ -330,6 +387,10 @@ export default function ActiveTripPage() {
           </View>
         )}
       </SafeAreaView>
+
+      <TouchableOpacity style={styles.recenterFab} onPress={fitBoth} activeOpacity={0.85}>
+        <Ionicons name="expand-outline" size={22} color={colors.text.primary} />
+      </TouchableOpacity>
 
       {/* Floating Bottom Car */}
       <View style={styles.bottomOverlay}>
@@ -470,8 +531,26 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
+    marginLeft: 6,
     fontSize: 16,
     fontWeight: '700',
+  },
+  recenterFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 230,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 20,
   },
   riderMarker: {
     width: 44,

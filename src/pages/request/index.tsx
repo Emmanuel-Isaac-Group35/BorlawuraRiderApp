@@ -15,7 +15,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 import Svg, { Circle } from 'react-native-svg';
@@ -260,8 +260,7 @@ export default function RequestPage() {
   };
 
   const handleNavigate = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${request.coordinates.lat},${request.coordinates.lng}`;
-    Linking.openURL(url);
+    // Navigatr Map natively guides rider from ActiveTrip tracking interface
   };
 
   const progress = (25 - timeLeft) / 25;
@@ -375,7 +374,13 @@ export default function RequestPage() {
               }}
               scrollEnabled={false}
               zoomEnabled={false}
+              toolbarEnabled={false}
             >
+              <UrlTile 
+                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maximumZ={19}
+                flipY={false}
+              />
               <Marker
                 coordinate={{
                   latitude: request.coordinates.lat,
@@ -383,14 +388,7 @@ export default function RequestPage() {
                 }}
               />
             </MapView>
-            <TouchableOpacity
-              onPress={handleNavigate}
-              style={styles.navigateButton}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="navigate" size={18} color={colors.primary} />
-              <Text style={styles.navigateButtonText}>Navigate</Text>
-            </TouchableOpacity>
+              {/* removed navigate external link button */}
           </View>
         </View>
 
@@ -409,7 +407,7 @@ export default function RequestPage() {
       {/* Action Buttons */}
       <View style={styles.actionBar}>
         <TouchableOpacity
-          onPress={handleDecline}
+          onPress={() => handleDecline(true)}
           disabled={isAccepting}
           style={[styles.actionButton, styles.declineButton]}
           activeOpacity={0.8}

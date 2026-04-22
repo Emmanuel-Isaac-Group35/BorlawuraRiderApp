@@ -5,6 +5,7 @@ export default function RequestPage() {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState(15);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [riderCoords, setRiderCoords] = useState<{lat: number, lng: number} | null>(null);
   const hasDeclinedRef = useRef(false);
 
   // Mock request data
@@ -26,6 +27,22 @@ export default function RequestPage() {
       handleDecline();
     }
   }, [timeLeft]);
+
+  useEffect(() => {
+    // Pick the actual live location of the rider
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setRiderCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => console.warn('Could not fetch rider location: ', error),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  }, []);
 
   const handleAccept = () => {
     setIsAccepting(true);
@@ -134,14 +151,15 @@ export default function RequestPage() {
         <div className="bg-white rounded-2xl shadow-md overflow-hidden mb-4">
           <div className="h-48 bg-gray-200 relative">
             <iframe
-              src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${request.coordinates.lat},${request.coordinates.lng}&zoom=15`}
+              src={`https://www.google.com/maps/embed/v1/directions?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&origin=${riderCoords ? `${riderCoords.lat},${riderCoords.lng}` : '5.6037,-0.1870'}&destination=${request.coordinates.lat},${request.coordinates.lng}&mode=driving`}
               width="100%"
               height="100%"
               style={{ border: 0 }}
               loading="lazy"
+              allowFullScreen={true}
             ></iframe>
             <button 
-              onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${request.coordinates.lat},${request.coordinates.lng}`, '_blank')}
+              onClick={() => window.open(`https://www.openstreetmap.org/directions?engine=fossgis_valhalla_car&route=5.6037%2C-0.1870%3B${request.coordinates.lat}%2C${request.coordinates.lng}`, '_blank')}
               className="absolute bottom-3 right-3 bg-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium text-emerald-600"
             >
               <i className="ri-navigation-line"></i>

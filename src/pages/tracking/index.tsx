@@ -7,9 +7,9 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useOpenRouteDirections } from '../../hooks/useOpenRouteDirections';
+import { useNavigatrDirections } from '../../hooks/useNavigatrDirections';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../utils/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -71,9 +71,10 @@ export default function TrackingPage() {
 
   const {
     coordinates: routeCoords,
+    summary: routeSummary,
     loading: routeLoading,
     error: routeFetchError,
-  } = useOpenRouteDirections(routeOrigin, routeDestination, 750);
+  } = useNavigatrDirections(routeOrigin, routeDestination, 750);
 
   useEffect(() => {
     let cancelled = false;
@@ -347,28 +348,43 @@ export default function TrackingPage() {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
+        mapType="hybrid"
         initialRegion={{
           latitude: (location.coords.latitude + pickupCoords.lat) / 2,
           longitude: (location.coords.longitude + pickupCoords.lng) / 2,
           latitudeDelta: 0.08,
           longitudeDelta: 0.08,
         }}
+        onLongPress={(e) => {
+          setLocation({
+            ...location,
+            coords: {
+              ...location.coords,
+              latitude: e.nativeEvent.coordinate.latitude,
+              longitude: e.nativeEvent.coordinate.longitude
+            }
+          });
+        }}
         showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={true}
+        toolbarEnabled={false}
       >
         <Marker
           coordinate={{
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           }}
-          anchor={{ x: 0.5, y: 0.5 }}
+          anchor={{ x: 0.5, y: 1 }}
           zIndex={10}
-          title="Your location"
-          description="Rider"
         >
-          <View style={styles.riderMarker}>
-            <Ionicons name="navigate" size={18} color="#fff" />
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Rider</Text>
+            </View>
+            <View style={[styles.riderMarker, { marginBottom: 0 }]}>
+              <Ionicons name="navigate" size={18} color="#fff" />
+            </View>
           </View>
         </Marker>
 
@@ -379,14 +395,10 @@ export default function TrackingPage() {
           }}
           anchor={{ x: 0.5, y: 1 }}
           zIndex={5}
-          title="Customer pickup"
-          description={pickupAddress}
         >
-          <View style={styles.customerMarkerColumn}>
-            <View style={styles.customerLabel}>
-              <Text style={styles.customerLabelText} numberOfLines={1}>
-                Pickup
-              </Text>
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ backgroundColor: '#1A73E8', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Customer</Text>
             </View>
             <View style={styles.customerDotOuter}>
               <View style={styles.customerDotInner} />
@@ -395,13 +407,29 @@ export default function TrackingPage() {
         </Marker>
 
         {routeCoords && routeCoords.length >= 2 ? (
-          <Polyline
-            coordinates={routeCoords}
-            strokeColor={colors.blue[600]}
-            strokeWidth={5}
-            lineCap="round"
-            lineJoin="round"
-          />
+          <>
+            <Polyline
+              coordinates={routeCoords}
+              strokeColor="#000000"
+              strokeWidth={9}
+              lineCap="square"
+              lineJoin="miter"
+            />
+            <Polyline
+              coordinates={routeCoords}
+              strokeColor="#3b00ff"
+              strokeWidth={6}
+              lineCap="square"
+              lineJoin="miter"
+            />
+            <Marker coordinate={routeCoords[Math.floor(routeCoords.length / 2)]}>
+              <View style={{ backgroundColor: '#0022cc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#fff' }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                  {routeSummary?.durationMin ? `${routeSummary.durationMin} min` : '1 min'}
+                </Text>
+              </View>
+            </Marker>
+          </>
         ) : !routeLoading ? (
           <Polyline
             coordinates={[

@@ -1,4 +1,4 @@
-
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function TripCompletePage() {
@@ -20,114 +20,111 @@ export default function TripCompletePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex flex-col items-center justify-center px-4">
-      {/* Success Animation */}
-      <div className="mb-6">
-        <div className="w-24 h-24 bg-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce-once">
-          <i className="ri-checkbox-circle-fill text-white text-6xl"></i>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">Trip Completed!</h1>
-        <p className="text-sm text-gray-600 text-center">Great job! The pickup has been recorded successfully.</p>
-      </div>
-
-      {/* Trip Summary */}
-      <div className="bg-white rounded-2xl shadow-md p-5 mb-4 w-full max-w-md">
-        <h3 className="font-semibold text-gray-800 mb-4">Trip Summary</h3>
+    <div className="min-h-screen bg-[#F0FDF4] flex flex-col items-center justify-center p-6 font-sans">
+      <div className="w-full max-w-md bg-gradient-to-br from-emerald-50 to-white min-h-[90vh] rounded-[40px] shadow-2xl shadow-emerald-100 overflow-hidden flex flex-col">
         
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <i className="ri-user-line text-emerald-600 text-xl"></i>
-            </div>
-            <div className="flex-1">
-              <p className="text-xs text-gray-500">Customer</p>
-              <p className="font-medium text-gray-800 text-sm">{tripData.customerName}</p>
+        {/* Success Header */}
+        <div className="pt-12 pb-8 flex flex-col items-center">
+          <div className="relative mb-6">
+            <div className="w-28 h-28 bg-[#10b981]/10 rounded-full flex items-center justify-center animate-pulse">
+              <div className="w-20 h-20 bg-gradient-to-tr from-[#10b981] to-[#059669] rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
             </div>
           </div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Trip Completed!</h1>
+          <p className="text-slate-500 font-medium mt-1">Thanks for completing this pickup.</p>
+        </div>
 
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <i className="ri-map-pin-line text-blue-600 text-xl"></i>
+        {/* Info Card */}
+        <div className="px-6 flex-1">
+          <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-100 border border-slate-50">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-slate-800">Trip Summary</h3>
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-wider">{tripData.date}</span>
             </div>
-            <div className="flex-1">
-              <p className="text-xs text-gray-500">Pickup</p>
-              <p className="font-medium text-gray-800 text-sm">{tripData.pickupLocation}</p>
+
+            <div className="space-y-5">
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Customer</p>
+                  <p className="font-bold text-slate-800">{tripData.customerName}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pickup</p>
+                  <p className="font-bold text-slate-800 truncate">{tripData.pickupLocation}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Drop-off</p>
+                  <p className="font-bold text-slate-800">{tripData.dropLocation}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-slate-100 flex justify-between items-center px-2">
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 mb-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </div>
+                <p className="text-[10px] font-bold text-slate-400">TYPE</p>
+                <p className="text-xs font-black text-slate-800">{tripData.wasteType}</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-teal-600 mb-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                </div>
+                <p className="text-[10px] font-bold text-slate-400">DIST</p>
+                <p className="text-xs font-black text-slate-800">{tripData.distance} km</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 bg-pink-50 rounded-full flex items-center justify-center text-pink-600 mb-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <p className="text-[10px] font-bold text-slate-400">DUR</p>
+                <p className="text-xs font-black text-slate-800">{tripData.duration}</p>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <i className="ri-building-2-line text-purple-600 text-xl"></i>
+        {/* Actions */}
+        <div className="p-6 space-y-4">
+          <button
+            onClick={handleDone}
+            className="w-full bg-gradient-to-r from-[#10b981] to-[#059669] text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-emerald-100 hover:scale-[1.02] active:scale-100 transition-all flex items-center justify-center gap-3"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+            Back to Home
+          </button>
+
+          <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-[24px] p-5 flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
             </div>
             <div className="flex-1">
-              <p className="text-xs text-gray-500">Drop-off</p>
-              <p className="font-medium text-gray-800 text-sm">{tripData.dropLocation}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100">
-            <div className="text-center">
-              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                <i className="ri-delete-bin-line text-amber-600"></i>
-              </div>
-              <p className="text-xs text-gray-500">Type</p>
-              <p className="text-xs font-medium text-gray-800">{tripData.wasteType}</p>
-            </div>
-            <div className="text-center">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                <i className="ri-route-line text-green-600"></i>
-              </div>
-              <p className="text-xs text-gray-500">Distance</p>
-              <p className="text-xs font-medium text-gray-800">{tripData.distance} km</p>
-            </div>
-            <div className="text-center">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                <i className="ri-time-line text-red-600"></i>
-              </div>
-              <p className="text-xs text-gray-500">Duration</p>
-              <p className="text-xs font-medium text-gray-800">{tripData.duration}</p>
+              <p className="text-[#1E40AF] font-black text-sm">Keep it up!</p>
+              <p className="text-[#3B82F6] text-[11px] font-bold leading-tight">Complete 2 more trips today to earn a special bonus.</p>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Action Buttons */}
-      <div className="w-full max-w-md space-y-3">
-        <button
-          onClick={handleDone}
-          className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-base shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
-        >
-          <i className="ri-home-5-line text-xl"></i>
-          Back to Home
-        </button>
-      </div>
-
-      {/* Encouragement Message */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 w-full max-w-md flex gap-3">
-        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-          <i className="ri-trophy-line text-white"></i>
-        </div>
-        <div>
-          <p className="font-semibold text-gray-800 text-sm mb-1">Keep it up!</p>
-          <p className="text-xs text-gray-600">
-            You're doing great! Keep completing trips to maintain your high rating.
-          </p>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes bounce-once {
-          0%, 100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
-        }
-        .animate-bounce-once {
-          animation: bounce-once 0.6s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 }
