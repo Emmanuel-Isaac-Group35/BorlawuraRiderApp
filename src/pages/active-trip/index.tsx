@@ -98,24 +98,6 @@ export default function ActiveTripPage() {
     }
   }, [routeSummary]);
 
-  // Proximity Geofencing: Auto-notify user when rider is within 50 meters
-  useEffect(() => {
-    if (currentStatus === 'driving_to_pickup' && routeInfo?.distance !== undefined) {
-      if (routeInfo.distance <= 0.05) {
-        // Automatically arrive when extremely close
-        setCurrentStatus('arrived_at_pickup');
-        if (dbTrip?.id) {
-          supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id).then(() => {
-            Alert.alert(
-              "Customer Notified",
-              "You have reached the pickup location! The customer has been automatically notified that you arrived."
-            );
-          }).catch(err => console.error("Auto-arrival failed:", err));
-        }
-      }
-    }
-  }, [routeInfo?.distance, currentStatus, dbTrip?.id]);
-
   useEffect(() => {
     if (!routeCoordinates?.length || routeCoordinates.length < 2 || !mapRef.current) return;
     mapRef.current.fitToCoordinates(routeCoordinates, {

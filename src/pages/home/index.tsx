@@ -154,128 +154,14 @@ export default function HomePage() {
     return () => unsubscribe();
   }, [isOnline, user]);
 
-  // Focus effect to load stats and refresh order queue
+  // Focus effect to load stats
   useFocusEffect(
     useCallback(() => {
-      if (user) loadStats();
-      
-      if (!user || !isOnline) return;
-
-      const isVerified = !!profile?.license_photo_url && 
-                         !!profile?.ghana_card_photo_url && 
-                         !!profile?.vehicle_photo_url;
-      if (!isVerified) {
-         updateOnlineStatus(false);
-         return;
+      if (user) {
+        loadStats();
       }
-
-      const checkMissedOrders = async () => {
-         try {
-           const { data } = await supabase.from('orders')
-             .select('*')
-             .eq('status', 'pending')
-             .order('created_at', { ascending: false })
-             .limit(1);
-
-           if (data && data.length > 0) {
-              const isRequestedForOtherRider = data[0].rider_id && data[0].rider_id !== user.id;
-              if (!isRequestedForOtherRider) {
-                 handleNewOrderPayload({ new: data[0] });
-              }
-           }
-         } catch (err) {
-           console.error("Missed orders check failed:", err);
-         }
-      };
-      
-      checkMissedOrders();
-
-      const tripsSubscription = supabase
-        .channel('new-trip-requests-focus')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, handleNewOrderPayload)
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(tripsSubscription);
-      };
-    }, [user, isOnline, settings, profile])
+    }, [user])
   );
-
-  const handleNewOrderPayload = async (payload: any) => {
-    const isRequestedForOtherRider = payload.new.rider_id && payload.new.rider_id !== user?.id;
-
-    if (payload.new.status === 'pending' && isOnline && !isRequestedForOtherRider && user) {
-      const enrichedTrip = { ...payload.new };
-      const tripId = payload.new.user_id || payload.new.userId || payload.new.customer_id;
-      
-      const existingName = payload.new.customer_name || payload.new.customerName || 
-                        payload.new.user_name || payload.new.userName || 
-                        payload.new.full_name || payload.new.fullName ||
-                        payload.new.client_name || payload.new.clientName ||
-                        (payload.new.first_name ? (`${payload.new.first_name} ${payload.new.last_name || ''}`).trim() : null);
-
-      if (tripId && (!existingName || existingName === 'Customer')) {
-        try {
-          let { data: profile_data, error: profile_error } = await supabase
-            .from('profiles')
-            .select('full_name, first_name, last_name, email')
-            .eq('id', tripId)
-            .maybeSingle();
-          
-          if (!profile_data || profile_error?.code === '42P01') {
-              const { data: riderProfile } = await supabase
-              .from('riders')
-              .select('first_name, last_name, email')
-              .eq('id', tripId)
-              .maybeSingle();
-              if (riderProfile) profile_data = { ...riderProfile, full_name: null } as any;
-          }
-
-          if (profile_data) {
-            const resolvedName = (profile_data as any).full_name || 
-                                        ((profile_data as any).first_name ? (`${(profile_data as any).first_name} ${(profile_data as any).last_name || ''}`).trim() : 
-                                        ((profile_data as any).email?.split('@')[0] || 'Customer'));
-            enrichedTrip.customer_name = resolvedName;
-
-            await supabase
-              .from('orders')
-              .update({ customer_name: resolvedName })
-              .eq('id', payload.new.id);
-          }
-        } catch (err) {
-          console.error('Error fetching/updating customer profile:', err);
-        }
-      } else if (existingName && existingName !== 'Customer') {
-          enrichedTrip.customer_name = existingName;
-      }
-
-      // Auto-Accept Logic
-      if (settings.autoAccept) {
-          try {
-            await supabase
-              .from('orders')
-              .update({ 
-                rider_id: user.id, 
-                status: 'accepted',
-                accepted_at: new Date().toISOString() 
-              })
-              .eq('id', payload.new.id);
-            
-            navigation.navigate('ActiveTrip' as never, { trip: enrichedTrip } as never);
-            return;
-          } catch (e) {
-            console.error('Auto-accept failed:', e);
-          }
-      }
-
-      if (settings.pushNotifications) {
-        setShowNotification(true);
-        setTimeout(() => {
-          navigation.navigate('Request', { trip: enrichedTrip });
-        }, 1000);
-      }
-    }
-  };
 
   useEffect(() => {
     if (profile) {
@@ -345,7 +231,112 @@ export default function HomePage() {
     };
   }, []);
 
-  // The realtime orders listener was moved into useFocusEffect above perfectly.
+  // Listen for realtime orders
+  useEffect(() => {
+    if (!user || !isOnline) return;
+
+    // Secondary Security check: Ensure documents are still present
+    const isVerified = !!profile?.license_photo_url && 
+                       !!profile?.ghana_card_photo_url && 
+                       !!profile?.vehicle_photo_url;
+    
+    if (!isVerified) {
+       // If somehow online but not verified, force offline
+       updateOnlineStatus(false);
+       return;
+    }
+
+    const tripsSubscription = supabase
+      .channel('new-trip-requests')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+        },
+        async (payload: any) => {
+          const isRequestedForOtherRider = payload.new.rider_id && payload.new.rider_id !== user.id;
+
+          if (payload.new.status === 'pending' && isOnline && !isRequestedForOtherRider) {
+            const enrichedTrip = { ...payload.new };
+            const tripId = payload.new.user_id || payload.new.userId || payload.new.customer_id;
+            
+            const existingName = payload.new.customer_name || payload.new.customerName || 
+                             payload.new.user_name || payload.new.userName || 
+                             payload.new.full_name || payload.new.fullName ||
+                             payload.new.client_name || payload.new.clientName ||
+                             (payload.new.first_name ? (`${payload.new.first_name} ${payload.new.last_name || ''}`).trim() : null);
+
+            if (tripId && (!existingName || existingName === 'Customer')) {
+              try {
+                let { data: profile_data, error: profile_error } = await supabase
+                  .from('profiles')
+                  .select('full_name, first_name, last_name, email')
+                  .eq('id', tripId)
+                  .maybeSingle();
+                
+                if (!profile_data || profile_error?.code === '42P01') {
+                   const { data: riderProfile } = await supabase
+                    .from('riders')
+                    .select('first_name, last_name, email')
+                    .eq('id', tripId)
+                    .maybeSingle();
+                   if (riderProfile) profile_data = { ...riderProfile, full_name: null } as any;
+                }
+
+                if (profile_data) {
+                  const resolvedName = (profile_data as any).full_name || 
+                                              ((profile_data as any).first_name ? (`${(profile_data as any).first_name} ${(profile_data as any).last_name || ''}`).trim() : 
+                                              ((profile_data as any).email?.split('@')[0] || 'Customer'));
+                  enrichedTrip.customer_name = resolvedName;
+
+                  await supabase
+                    .from('orders')
+                    .update({ customer_name: resolvedName })
+                    .eq('id', payload.new.id);
+                }
+              } catch (err) {
+                console.error('Error fetching/updating customer profile:', err);
+              }
+            } else if (existingName && existingName !== 'Customer') {
+               enrichedTrip.customer_name = existingName;
+            }
+
+            // Auto-Accept Logic
+            if (settings.autoAccept) {
+               try {
+                 await supabase
+                   .from('orders')
+                   .update({ 
+                     rider_id: user.id, 
+                     status: 'accepted',
+                     accepted_at: new Date().toISOString() 
+                   })
+                   .eq('id', payload.new.id);
+                 
+                 navigation.navigate('ActiveTrip' as never, { trip: enrichedTrip } as never);
+                 return;
+               } catch (e) {
+                 console.error('Auto-accept failed:', e);
+               }
+            }
+
+            if (settings.pushNotifications) {
+              setShowNotification(true);
+              setTimeout(() => {
+                navigation.navigate('Request', { trip: enrichedTrip });
+              }, 1000);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tripsSubscription);
+    };
+  }, [user, isOnline]);
 
   const loadStats = async () => {
     if (!user) return;
