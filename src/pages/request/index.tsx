@@ -9,13 +9,14 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 import Svg, { Circle } from 'react-native-svg';
@@ -47,6 +48,27 @@ export default function RequestPage() {
   const [fullTripData, setFullTripData] = useState(trip);
 
   const hasDeclinedRef = useRef(false);
+
+  useEffect(() => {
+    // Ringtone and Vibration Effect
+    const playRingtone = async () => {
+      try {
+        // Use a generic pleasant ding if no local file is available, or rely heavily on vibration pattern
+        // Here we create a simple oscillating vibration pattern: vibrate 500ms, pause 1000ms
+        const PATTERN = [0, 500, 1000];
+        Vibration.vibrate(PATTERN, true); // true = loop
+
+      } catch (err) {
+         console.log("Audio/Vibration error", err);
+      }
+    };
+
+    playRingtone();
+
+    return () => {
+      Vibration.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     async function resolveAllTripData() {
@@ -372,15 +394,14 @@ export default function RequestPage() {
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
+              provider={PROVIDER_GOOGLE}
               scrollEnabled={false}
               zoomEnabled={false}
               toolbarEnabled={false}
+              showsUserLocation={false} 
+              showsMyLocationButton={false}
+              showsCompass={false}
             >
-              <UrlTile 
-                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                maximumZ={19}
-                flipY={false}
-              />
               <Marker
                 coordinate={{
                   latitude: request.coordinates.lat,

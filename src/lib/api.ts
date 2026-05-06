@@ -9,7 +9,6 @@ const mapTrip = (trip: any) => ({
                  (trip.customer?.first_name ? `${trip.customer.first_name} ${trip.customer.last_name || ''}`.trim() : 
                  (trip.customer?.email?.split('@')[0] || 'Customer')),
     pickupLocation: trip.address || trip.pickup_location,
-    dropLocation: trip.drop_location || 'N/A',
     wasteType: trip.waste_type || 'General Waste',
     fare: trip.amount || trip.fare || 0,
     date: new Date(trip.created_at).toISOString().split('T')[0],
@@ -22,12 +21,13 @@ const mapTrip = (trip: any) => ({
 
 
 export const fetchTrips = async (userId: string) => {
-    // Fetch orders first
+    // Fetch orders first, limited to recent 100 trips for speed
     const { data: orders, error } = await supabase
         .from('orders')
         .select('*')
         .eq('rider_id', userId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
     if (error) {
         throw error;
@@ -36,30 +36,43 @@ export const fetchTrips = async (userId: string) => {
     if (!orders || orders.length === 0) return [];
 
     // Fetch unique user profiles to get names
-    const userIds = [...new Set(orders.map(o => o.user_id).filter(id => !!id))];
-    let { data: profiles, error: profileErr } = await supabase
-        .from('profiles')
-        .select('id, full_name, first_name, last_name, email')
-        .in('id', userIds);
-
-    // Fallback to riders if profiles is missing (42P01 or no data)
-    if (!profiles || profileErr?.code === '42P01') {
-        const { data: riders } = await supabase
+    const rawIds = orders.map(o => o.user_id || o.userId || o.customer_id).filter(id => !!id);
+    const userIds = [...new Set(rawIds)];
+    
+    // Run both profile queries concurrently for maximum speed
+    const [customersRes, ridersRes] = await Promise.all([
+        supabase
+            .from('users')
+            .select('id, full_name, email, avatar_url')
+            .in('id', userIds),
+        supabase
             .from('riders')
-            .select('id, first_name, last_name, email')
-            .in('id', userIds);
-        profiles = (riders || []).map(r => ({ ...r, full_name: null })) as any;
-    }
+            .select('id, first_name, last_name, email, avatar_url')
+            .in('id', userIds)
+    ]);
+
+    const customers = customersRes.data || [];
+    const riders = ridersRes.data || [];
+        
+    let profiles = [
+        ...customers,
+        ...riders.map(r => ({ ...r, full_name: null }))
+    ];
 
     const profileMap = (profiles || []).reduce((map: any, p: any) => {
-        map[p.id] = p.full_name || 
+        map[p.id] = {
+            name: p.full_name || 
                    p.fullName || 
                    (p.first_name ? `${p.first_name} ${p.last_name || ''}`.trim() : 
-                   (p.email?.split('@')[0] || null));
+                   (p.email?.split('@')[0] || null)),
+            avatarUrl: p.avatar_url || p.avatarUrl || null
+        };
         return map;
     }, {} as any);
 
     return orders.map(order => {
+        const pMatch = profileMap[order.user_id] || profileMap[order.userId] || profileMap[order.customer_id] || profileMap[order.rider_id];
+        
         // High-res name detection searching every conceivable field
         const resolvedName = order.customer_name || 
                            order.customerName || 
@@ -70,18 +83,19 @@ export const fetchTrips = async (userId: string) => {
                            order.name ||
                            order.client_name ||
                            (order.first_name ? `${order.first_name} ${order.last_name || ''}`.trim() : null) || 
-                           profileMap[order.user_id] || 
-                           profileMap[order.userId] || 
-                           profileMap[order.customer_id] || 
-                           profileMap[order.rider_id] || // Check rider if all else fails
+                           (pMatch?.name) || 
                            'Customer';
+
+        const rawAvatarUrl = order.customer_avatar_url || pMatch?.avatarUrl;
+        const isValidAvatar = rawAvatarUrl && (rawAvatarUrl.startsWith('http://') || rawAvatarUrl.startsWith('https://'));
 
         return {
             ...mapTrip(order),
             // Ensure we never return the generic 'Customer' if we have a profile match
-            customerName: (resolvedName === 'Customer' && profileMap[order.user_id]) 
-                ? profileMap[order.user_id] 
-                : resolvedName
+            customerName: (resolvedName === 'Customer' && pMatch?.name) 
+                ? pMatch.name 
+                : resolvedName,
+            customerAvatarUrl: isValidAvatar ? rawAvatarUrl : null
         };
     });
 };
@@ -106,12 +120,12 @@ export const fetchStats = async (userId: string) => {
     const todayEarnings = todayTrips?.reduce((sum, trip) => sum + (trip.amount || 0), 0) || 0;
     const todayTripsCount = todayTrips?.length || 0;
 
-    // Fetch ALL time trips handled (excluding cancelled)
+    // Fetch ALL time COMPLETED trips
     const { data: tripsHandle, error: tripsError } = await supabase
         .from('orders')
         .select('status')
         .eq('rider_id', userId)
-        .neq('status', 'cancelled');
+        .eq('status', 'completed');
 
     const totalTrips = tripsHandle?.length || 0;
 

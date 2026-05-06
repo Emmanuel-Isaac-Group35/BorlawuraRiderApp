@@ -23,6 +23,8 @@ export default function PersonalInfoPage() {
     const [lastName, setLastName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [languages, setLanguages] = useState<string[]>(['English']);
     const [showLangModal, setShowLangModal] = useState(false);
 
@@ -141,14 +143,26 @@ export default function PersonalInfoPage() {
                             <Text style={styles.label}>Password</Text>
                             <Text style={styles.requiredStar}>*</Text>
                         </View>
-                        <TextInput
-                            style={styles.input}
-                            value={password}
-                            onChangeText={setPassword}
-                            placeholder="Min. 6 characters"
-                            placeholderTextColor="#9ca3af"
-                            secureTextEntry
-                        />
+                        <View style={styles.passwordInputWrapper}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, borderWidth: 0 }]}
+                                value={password}
+                                onChangeText={setPassword}
+                                placeholder="Min. 6 characters"
+                                placeholderTextColor="#9ca3af"
+                                secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity 
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons 
+                                    name={showPassword ? "eye-off" : "eye"} 
+                                    size={20} 
+                                    color="#9ca3af" 
+                                />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Confirm Password */}
@@ -157,14 +171,26 @@ export default function PersonalInfoPage() {
                             <Text style={styles.label}>Confirm Password</Text>
                             <Text style={styles.requiredStar}>*</Text>
                         </View>
-                        <TextInput
-                            style={styles.input}
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            placeholder="Re-enter password"
-                            placeholderTextColor="#9ca3af"
-                            secureTextEntry
-                        />
+                        <View style={styles.passwordInputWrapper}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, borderWidth: 0 }]}
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                placeholder="Re-enter password"
+                                placeholderTextColor="#9ca3af"
+                                secureTextEntry={!showConfirmPassword}
+                            />
+                            <TouchableOpacity 
+                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons 
+                                    name={showConfirmPassword ? "eye-off" : "eye"} 
+                                    size={20} 
+                                    color="#9ca3af" 
+                                />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Language */}
@@ -353,6 +379,16 @@ const styles = StyleSheet.create({
         padding: 12,
         fontSize: 16,
         color: '#000',
+    },
+    passwordInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+    },
+    eyeIcon: {
+        padding: 12,
     },
     inputError: {
         borderColor: '#ef4444',

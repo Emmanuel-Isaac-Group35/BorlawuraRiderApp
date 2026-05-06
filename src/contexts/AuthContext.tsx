@@ -1,8 +1,18 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
+import { navigate } from '../navigation/RootNavigation';
 import { Profile } from '../types/supabase';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 type AuthContextType = {
     session: Session | null;
@@ -78,7 +88,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         loadSettings();
+        requestNotificationPermissions();
     }, []);
+
+    const requestNotificationPermissions = async () => {
+        try {
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+            if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
+            }
+            if (finalStatus !== 'granted') {
+                console.log('Push notification permission denied');
+            }
+        } catch (e) {
+            console.error('Failed to request notification permissions:', e);
+        }
+    };
 
     const loadSettings = async () => {
         try {
@@ -118,10 +145,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
 
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+            if (error) {
+                console.error('Session error (clearing local session):', error.message);
+                await supabase.auth.signOut();
+            }
             setSession(session);
             setUser(session?.user ?? null);
-            if (session?.user) {
+            if (session?.user && !error) {
                 forceOfflineAndFetch(session.user.id);
             } else {
                 setLoading(false);
@@ -176,6 +207,64 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             supabase.removeChannel(profileSubscription);
         };
     }, [user]);
+
+    // Global listener for new incoming orders
+    useEffect(() => {
+        // Only listen if the user is online
+        if (!user || !profile?.is_online) return;
+
+        const ordersSubscription = supabase
+            .channel('global-orders-listener')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: 'status=eq.pending',
+                },
+                async (payload) => {
+                    console.log('Global listener: New pending order received!', payload.new);
+                    
+                    if (settings.pushNotifications) {
+                        try {
+                            await Notifications.scheduleNotificationAsync({
+                                content: {
+                                    title: "New Pickup Request! 🚨",
+                                    body: "A new waste pickup request is available near you. Tap to open Borlawura.",
+                                    data: { orderId: payload.new.id },
+                                    sound: settings.soundAlerts ? 'default' : null,
+                                },
+                                trigger: null, // trigger immediately
+                            });
+                        } catch (e) {
+                            console.error('Error triggering local notification:', e);
+                        }
+                    }
+                }
+            )
+            .subscribe();
+
+        // Listen for notification TAPS (Deep Linking)
+        const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+            const data = response.notification.request.content.data;
+            if (data?.orderId) {
+                // Fetch the full order data and navigate
+                supabase.from('orders').select('*').eq('id', data.orderId).maybeSingle().then(({data: tripData}) => {
+                   if (tripData) {
+                      navigate('Request', { trip: tripData });
+                   }
+                });
+            }
+        });
+
+        return () => {
+            supabase.removeChannel(ordersSubscription);
+            if (responseListener) {
+               responseListener.remove();
+            }
+        };
+    }, [user, profile?.is_online, settings.pushNotifications, settings.soundAlerts]);
 
     // Refresh session on app resume
     useEffect(() => {

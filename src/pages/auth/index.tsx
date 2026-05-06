@@ -15,11 +15,14 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 
+import { Ionicons } from '@expo/vector-icons';
+
 export default function AuthPage({ route }: any) {
     const navigation = useNavigation<any>();
     const { isLogin: initialIsLogin = true } = route.params || {};
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const handleAuth = async () => {
@@ -76,14 +79,33 @@ export default function AuthPage({ route }: any) {
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Password</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="••••••••"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                        />
+                        <View style={styles.passwordInputWrapper}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, borderWidth: 0 }]}
+                                placeholder="••••••••"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity 
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons 
+                                    name={showPassword ? "eye-off" : "eye"} 
+                                    size={20} 
+                                    color={colors.gray[400]} 
+                                />
+                            </TouchableOpacity>
+                        </View>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.forgotPasswordButton}
+                        onPress={() => navigation.navigate('ForgotPassword')}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.button}
@@ -167,6 +189,26 @@ const styles = StyleSheet.create({
         padding: 12,
         fontSize: 16,
         color: colors.text.primary,
+    },
+    passwordInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.gray[50],
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.gray[200],
+    },
+    eyeIcon: {
+        padding: 12,
+    },
+    forgotPasswordButton: {
+        alignSelf: 'flex-end',
+        marginBottom: 16,
+    },
+    forgotPasswordText: {
+        color: colors.primary,
+        fontSize: 14,
+        fontWeight: '600',
     },
     button: {
         backgroundColor: colors.primary,

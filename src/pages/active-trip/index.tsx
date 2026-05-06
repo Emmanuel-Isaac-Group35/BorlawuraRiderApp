@@ -19,14 +19,52 @@ import { supabase } from '../../lib/supabase';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNavigatrDirections } from '../../hooks/useNavigatrDirections';
+import { SwipeButton } from '../../components/common/SwipeButton';
 
 const { width, height } = Dimensions.get('window');
 const ROUTE_BLUE = '#1A73E8';
 
-// Custom minimalist map style
-const mapStyle = [
-  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] }
+const lightMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
+  { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#bdbdbd" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#dadada" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+  { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+  { featureType: "transit.line", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
+  { featureType: "transit.station", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] }
+];
+
+const darkMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
+  { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
 ];
 
 type RootStackParamList = {
@@ -46,9 +84,22 @@ export default function ActiveTripPage() {
   const route = useRoute<ActiveTripRouteProp>();
   const dbTrip = route.params?.trip;
   
+  const currentHour = new Date().getHours();
+  const isNightMode = currentHour < 6 || currentHour >= 18;
+  
   const mapRef = useRef<MapView>(null);
+  const markerRef = useRef<any>(null);
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
-  const [currentStatus, setCurrentStatus] = useState<TripStatus>('accept_to_tracking');
+  
+  // Use DB sub_status to ensure we recover exactly where we left off
+  const [currentStatus, setCurrentStatus] = useState<TripStatus>(() => {
+    const validStatuses = ['driving_to_pickup', 'arrived_at_pickup', 'waste_collected'];
+    if (dbTrip?.sub_status && validStatuses.includes(dbTrip.sub_status)) {
+      return dbTrip.sub_status as TripStatus;
+    }
+    return 'accept_to_tracking';
+  });
+
   const [routeInfo, setRouteInfo] = useState<{distance: number, duration: number} | null>(null);
   
   const [customerName, setCustomerName] = useState(
@@ -116,6 +167,9 @@ export default function ActiveTripPage() {
       animated: true,
     });
   };
+
+  // Removed animateMarkerToCoordinate as it causes a native crash in the New Architecture (Fabric)
+  // The Marker will naturally update its position via the currentLocation state binding.
 
   useEffect(() => {
     // Name and Phone fetching logic
@@ -206,6 +260,7 @@ export default function ActiveTripPage() {
   const handleAction = async () => {
     if (currentStatus === 'accept_to_tracking') {
       setCurrentStatus('driving_to_pickup');
+      if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'driving_to_pickup' }).eq('id', dbTrip.id);
     } else if (currentStatus === 'driving_to_pickup') {
       setCurrentStatus('arrived_at_pickup');
       if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id);
@@ -241,6 +296,30 @@ export default function ActiveTripPage() {
     Linking.openURL(`tel:${phoneToCall}`);
   };
 
+  const handleCancelTrip = () => {
+    Alert.alert(
+      "Cancel Trip",
+      "Are you sure you want to cancel this trip? The order will be unassigned from you.",
+      [
+        { text: "No, Keep Trip", style: "cancel" },
+        { 
+          text: "Yes, Cancel", 
+          style: "destructive", 
+          onPress: async () => {
+            if (dbTrip?.id) {
+               await supabase.from('orders').update({ 
+                  status: 'pending', 
+                  sub_status: null,
+                  rider_id: null 
+               }).eq('id', dbTrip.id);
+            }
+            navigation.navigate('MainTabs');
+          }
+        }
+      ]
+    );
+  };
+
   if (!currentLocation) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
@@ -257,9 +336,9 @@ export default function ActiveTripPage() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        customMapStyle={mapStyle}
+        customMapStyle={isNightMode ? darkMapStyle : lightMapStyle}
         provider={PROVIDER_GOOGLE}
-        mapType="hybrid"
+        mapType="standard"
         initialRegion={{
           latitude: currentLocation.coords.latitude,
           longitude: currentLocation.coords.longitude,
@@ -281,29 +360,25 @@ export default function ActiveTripPage() {
         showsCompass={false}
         toolbarEnabled={false}
       >
-        {/* Rider marker */}
-        <Marker coordinate={{ latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude }} anchor={{ x: 0.5, y: 1 }} zIndex={10}>
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4 }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Rider</Text>
-            </View>
-            <View style={styles.riderMarker}>
-              <View style={styles.riderMarkerInner}>
-                <Ionicons name="car" size={18} color="#fff" />
-              </View>
-            </View>
+        {/* Rider marker (Top-down car) */}
+        <Marker 
+          ref={markerRef}
+          coordinate={{ latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude }} 
+          anchor={{ x: 0.5, y: 0.5 }} 
+          zIndex={10}
+          rotation={currentLocation.coords.heading || 0}
+        >
+          <View style={styles.carMarkerContainer}>
+            <View style={styles.carWindshield} />
+            <View style={styles.carRoof} />
+            <View style={styles.carRearWindow} />
           </View>
         </Marker>
 
         {/* Destination marker */}
-        <Marker coordinate={{ latitude: destination.lat, longitude: destination.lng }} anchor={{ x: 0.5, y: 1 }} zIndex={5}>
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ backgroundColor: '#1A73E8', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4 }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Customer</Text>
-            </View>
-            <View style={styles.destMarker}>
-               <Ionicons name="location" size={24} color={colors.primary} />
-            </View>
+        <Marker coordinate={{ latitude: destination.lat, longitude: destination.lng }} anchor={{ x: 0.5, y: 0.5 }} zIndex={5}>
+          <View style={styles.destMarkerContainer}>
+            <View style={styles.destMarkerInner} />
           </View>
         </Marker>
 
@@ -311,23 +386,24 @@ export default function ActiveTripPage() {
           <>
             <Polyline
               coordinates={routeCoordinates}
-              strokeColor="#000000"
-              strokeWidth={9}
-              lineCap="square"
-              lineJoin="miter"
+              strokeColor="#1E54B7" // Darker border-like blue
+              strokeWidth={7}
+              lineCap="round"
+              lineJoin="round"
             />
             <Polyline
               coordinates={routeCoordinates}
-              strokeColor="#3b00ff"
-              strokeWidth={6}
-              lineCap="square"
-              lineJoin="miter"
+              strokeColor="#4A89F3" // Uber bright blue
+              strokeWidth={4}
+              lineCap="round"
+              lineJoin="round"
             />
             <Marker coordinate={routeCoordinates[Math.floor(routeCoordinates.length / 2)]} zIndex={15}>
-              <View style={{ backgroundColor: '#0022cc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#fff' }}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                  {routeSummary?.durationMin ? `${routeSummary.durationMin} min` : '1 min'}
+              <View style={styles.etaMapBubble}>
+                <Text style={styles.etaMapBubbleTime}>
+                  {routeSummary?.durationMin ? routeSummary.durationMin : 1}
                 </Text>
+                <Text style={styles.etaMapBubbleMin}>min</Text>
               </View>
             </Marker>
           </>
@@ -361,37 +437,79 @@ export default function ActiveTripPage() {
             <Ionicons name="call" size={22} color={colors.primary} />
           </TouchableOpacity>
         </View>
-
-        {routeInfo && currentStatus === 'driving_to_pickup' && (
-          <View style={styles.etaPill}>
-            <Text style={styles.etaTime}>{Math.ceil(routeInfo.duration)} min</Text>
-            <Text style={styles.etaDist}>{routeInfo.distance.toFixed(1)} km</Text>
-          </View>
-        )}
       </SafeAreaView>
 
       <TouchableOpacity style={styles.recenterFab} onPress={fitBoth} activeOpacity={0.85}>
         <Ionicons name="expand-outline" size={22} color={colors.text.primary} />
       </TouchableOpacity>
 
-      {/* Floating Bottom Car */}
+      {/* Floating Bottom Card */}
       <View style={styles.bottomOverlay}>
         <View style={styles.bottomCard}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton, 
-              currentStatus === 'accept_to_tracking' ? styles.startNavBtn : styles.primaryBtn
-            ]}
-            onPress={handleAction}
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name={currentStatus === 'accept_to_tracking' ? 'navigate' : 'checkmark-circle'} 
-              size={24} 
-              color="#fff" 
-            />
-            <Text style={styles.actionButtonText}>{getButtonText()}</Text>
-          </TouchableOpacity>
+          {currentStatus !== 'accept_to_tracking' ? (
+            <View style={styles.uberDetailsContainer}>
+              <View style={styles.dragHandle} />
+              <Text style={styles.uberTitle}>
+                {currentStatus === 'driving_to_pickup' 
+                  ? `Pickup in ${routeInfo?.duration ? Math.ceil(routeInfo.duration) : 1} min`
+                  : currentStatus === 'arrived_at_pickup'
+                  ? 'Arrived at Pickup'
+                  : 'Waste Collected'}
+              </Text>
+              
+              <View style={styles.uberProfileRow}>
+                <View style={styles.uberAvatarWrapper}>
+                  <View style={styles.uberAvatar}>
+                     <Ionicons name="person" size={30} color={colors.gray[400]} />
+                  </View>
+                  <View style={styles.uberRatingBadge}>
+                    <Ionicons name="star" size={10} color="#DAA520" />
+                    <Text style={styles.uberRatingText}>5.0</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.uberInfoContent}>
+                  <View style={styles.uberInfoHeader}>
+                     <Text style={styles.uberName}>{customerName}</Text>
+                     <View style={styles.uberOrderBadge}>
+                       <Text style={styles.uberOrderBadgeText}>
+                         {dbTrip?.id ? `#${dbTrip.id.toString().substring(0, 4).toUpperCase()}` : 'ORD'}
+                       </Text>
+                     </View>
+                  </View>
+                  <Text style={styles.uberSubtitle}>Customer • Top-rated</Text>
+                </View>
+              </View>
+
+              <View style={styles.uberActionRow}>
+                <TouchableOpacity style={styles.uberChatBtn} onPress={handleCall}>
+                  <Ionicons name="call" size={24} color="#000" />
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <SwipeButton 
+                    title={`Swipe to ${getButtonText()}`} 
+                    onSwipeComplete={handleAction} 
+                  />
+                </View>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.startNavBtn]}
+              onPress={handleAction}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="navigate" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>Start Tracking</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Cancel Trip Button */}
+          {currentStatus !== 'waste_collected' && (
+            <TouchableOpacity style={styles.cancelTripBtn} onPress={handleCancelTrip}>
+              <Text style={styles.cancelTripText}>Cancel Trip</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
@@ -534,26 +652,225 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 20,
   },
-  riderMarker: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  destMarkerContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
-  riderMarkerInner: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
+  destMarkerInner: {
+    width: 6,
+    height: 6,
+    backgroundColor: '#fff',
+    borderRadius: 1, // slight square-ish
+  },
+  cancelTripBtn: {
+    alignSelf: 'center',
+    marginTop: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  cancelTripText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  carMarkerContainer: {
+    width: 24,
+    height: 44,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  carRoof: {
+    width: 18,
+    height: 20,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    zIndex: 2,
+  },
+  carWindshield: {
+    position: 'absolute',
+    top: 6,
+    width: 18,
+    height: 8,
+    backgroundColor: '#1f2937',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    zIndex: 1,
+  },
+  carRearWindow: {
+    position: 'absolute',
+    bottom: 6,
+    width: 16,
+    height: 5,
+    backgroundColor: '#1f2937',
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    zIndex: 1,
+  },
+  etaMapBubble: {
+    backgroundColor: '#5B4BBF',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  destMarker: {
+  etaMapBubbleTime: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  etaMapBubbleMin: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    lineHeight: 12,
+  },
+  uberDetailsContainer: {
+    width: '100%',
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  uberTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#000',
+    marginBottom: 20,
+  },
+  uberProfileRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 24,
+  },
+  uberAvatarWrapper: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  uberAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  uberRatingBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  uberRatingText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 2,
+    color: '#000',
+  },
+  uberInfoContent: {
+    flex: 1,
+  },
+  uberInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  uberName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  uberOrderBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  uberOrderBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+    letterSpacing: 0.5,
+  },
+  uberSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  uberActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  uberChatBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uberPrimaryBtn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F4F6',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  uberPrimaryBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
   }
 });

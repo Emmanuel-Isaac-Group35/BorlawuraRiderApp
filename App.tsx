@@ -8,7 +8,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import i18n from './src/i18n';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { AppNavigator } from './src/navigation';
-import { StyleSheet } from 'react-native';
+import { navigationRef } from './src/navigation/RootNavigation';
+import { StyleSheet, LogBox } from 'react-native';
+
+LogBox.ignoreLogs([
+  '`expo-notifications` functionality is not fully supported',
+  '[expo-av]: Expo AV has been deprecated',
+]);
 
 export default function App() {
   return (
@@ -16,7 +22,7 @@ export default function App() {
       <SafeAreaProvider>
         <I18nextProvider i18n={i18n}>
           <AuthProvider>
-            <NavigationContainer>
+            <NavigationContainer ref={navigationRef}>
               <AppNavigator />
               <StatusBar style="light" />
             </NavigationContainer>

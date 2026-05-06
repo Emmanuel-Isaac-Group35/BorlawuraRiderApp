@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../../lib/supabase';
@@ -154,13 +154,32 @@ export default function HomePage() {
     return () => unsubscribe();
   }, [isOnline, user]);
 
-  // Focus effect to load stats
+  // Focus effect to load stats and check for active trips (Crash Recovery)
   useFocusEffect(
     useCallback(() => {
+      const checkActiveTrip = async () => {
+        if (!user) return;
+        try {
+          const { data, error } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('rider_id', user.id)
+            .eq('status', 'active')
+            .maybeSingle();
+            
+          if (data && !error) {
+             navigation.navigate('ActiveTrip', { trip: data });
+          }
+        } catch (err) {
+          console.log('Crash recovery check failed:', err);
+        }
+      };
+
       if (user) {
         loadStats();
+        checkActiveTrip();
       }
-    }, [user])
+    }, [user, navigation])
   );
 
   useEffect(() => {
@@ -441,17 +460,12 @@ export default function HomePage() {
             }
           });
         }}
+        provider={PROVIDER_GOOGLE}
         showsUserLocation={false} 
         showsMyLocationButton={false}
         showsCompass={false}
-        customMapStyle={mapStyle}
         toolbarEnabled={false}
       >
-        <UrlTile 
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          flipY={false}
-        />
           {/* Custom car marker (The Rider) */}
           <Marker
              coordinate={{
@@ -564,21 +578,6 @@ export default function HomePage() {
     </View>
   );
 }
-
-const mapStyle = [
-  {
-    "elementType": "labels.icon",
-    "stylers": [{ "visibility": "off" }]
-  },
-  {
-    "featureType": "poi",
-    "stylers": [{ "visibility": "off" }]
-  },
-  {
-    "featureType": "transit",
-    "stylers": [{ "visibility": "off" }]
-  }
-];
 
 const styles = StyleSheet.create({
   container: {

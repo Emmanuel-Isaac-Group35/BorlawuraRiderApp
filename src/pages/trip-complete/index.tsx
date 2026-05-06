@@ -15,6 +15,7 @@ import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { colors } from '../../utils/colors';
 import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 const { width } = Dimensions.get('window');
 
@@ -62,8 +63,7 @@ export default function TripCompletePage() {
 
   const tripData = {
     customerName: customerName,
-    pickupLocation: dbTrip?.address || dbTrip?.pickup_location || 'Pickup Location',
-    dropLocation: dbTrip?.drop_location || 'N/A',
+    pickupLocation: dbTrip?.address || dbTrip?.pickup_location || 'N/A',
     wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
     distance: Number(dbTrip?.distance_value || dbTrip?.distance || 1.2).toFixed(1),
     duration: calculateDuration(),
@@ -74,7 +74,7 @@ export default function TripCompletePage() {
     }),
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     navigation.navigate('MainTabs');
   };
 
@@ -133,16 +133,6 @@ export default function TripCompletePage() {
                     <Text style={styles.itemValue} numberOfLines={1}>{tripData.pickupLocation}</Text>
                   </View>
                 </View>
-
-                <View style={styles.summaryItem}>
-                  <View style={[styles.iconBox, { backgroundColor: '#F3E8FF' }]}>
-                    <Feather name="target" size={20} color="#9333EA" />
-                  </View>
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemLabel}>Drop-off</Text>
-                    <Text style={styles.itemValue}>{tripData.dropLocation}</Text>
-                  </View>
-                </View>
               </View>
 
               <View style={styles.divider} />
@@ -186,8 +176,7 @@ export default function TripCompletePage() {
                   end={{ x: 1, y: 0 }}
                   style={styles.primaryButton}
                 >
-                  <Feather name="home" size={20} color="#fff" />
-                  <Text style={styles.primaryButtonText}>Back to Home</Text>
+                  <Text style={styles.primaryButtonText}>Done & Return Home</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -206,6 +195,13 @@ export default function TripCompletePage() {
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
+      <ConfettiCannon
+         count={100}
+         origin={{x: width / 2, y: -20}}
+         autoStart={true}
+         fadeOut={true}
+         fallSpeed={3500}
+      />
     </View>
   );
 }
@@ -379,7 +375,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
   },
   bonusBanner: {
