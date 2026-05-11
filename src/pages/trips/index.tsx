@@ -420,15 +420,6 @@ export default function TripsPage() {
           <SafeAreaView edges={['top']}>
             <View style={styles.headerTopRow}>
               <Text style={styles.headerTitle}>My Trips</Text>
-              <View style={styles.headerProfileImageContainer}>
-                {user?.user_metadata?.avatar_url ? (
-                  <Image source={{ uri: user.user_metadata.avatar_url }} style={styles.headerProfileImage} />
-                ) : (
-                  <Text style={styles.headerProfileInitial}>
-                    {(user?.user_metadata?.full_name || user?.user_metadata?.first_name || 'Rider').charAt(0).toUpperCase()}
-                  </Text>
-                )}
-              </View>
             </View>
           </SafeAreaView>
         </View>
@@ -458,15 +449,6 @@ export default function TripsPage() {
         <SafeAreaView edges={['top']}>
           <View style={styles.headerTopRow}>
             <Text style={styles.headerTitle}>My Trips</Text>
-            <TouchableOpacity style={styles.headerProfileImageContainer} onPress={() => navigation.navigate('Profile')}>
-              {user?.user_metadata?.avatar_url ? (
-                <Image source={{ uri: user.user_metadata.avatar_url }} style={styles.headerProfileImage} />
-              ) : (
-                <Text style={styles.headerProfileInitial}>
-                  {(user?.user_metadata?.full_name || user?.user_metadata?.first_name || 'Rider').charAt(0).toUpperCase()}
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </View>
