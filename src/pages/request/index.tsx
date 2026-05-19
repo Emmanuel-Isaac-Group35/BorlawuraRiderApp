@@ -186,6 +186,15 @@ export default function RequestPage() {
     coordinates: tripCoords
   };
 
+  const formatScheduleDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return dateString;
+    }
+  };
+
   useEffect(() => {
     if (isAccepting) return;
     if (timeLeft > 0) {
@@ -248,14 +257,25 @@ export default function RequestPage() {
 
       setIsAccepting(false);
       
-      // Navigate after a success alert
-      Alert.alert(
-        'Order Accepted', 
-        'You have successfully accepted this trip.',
-        [
-          { text: 'OK', onPress: () => navigation.replace('ActiveTrip', { trip }) }
-        ]
-      );
+      const isScheduled = fullTripData?.service_type === 'Scheduled Pickup' || fullTripData?.service_type === 'Scheduled' || !!fullTripData?.pickup_time;
+      
+      if (isScheduled) {
+        Alert.alert(
+          'Scheduled Order Accepted', 
+          'You have successfully accepted this scheduled trip. You can view it in your Trips tab.',
+          [
+            { text: 'OK', onPress: () => navigation.navigate('MainTabs' as never) }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Order Accepted', 
+          'You have successfully accepted this trip.',
+          [
+            { text: 'OK', onPress: () => navigation.replace('ActiveTrip', { trip }) }
+          ]
+        );
+      }
     } catch (error) {
       console.error('Error accepting trip:', error);
       setIsAccepting(false);
@@ -298,7 +318,9 @@ export default function RequestPage() {
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>New Pickup Request</Text>
+          <Text style={styles.headerTitle}>
+            {(fullTripData?.service_type === 'Scheduled Pickup' || fullTripData?.service_type === 'Scheduled' || fullTripData?.pickup_time) ? '📅 Scheduled Request' : 'New Pickup Request'}
+          </Text>
           <View style={styles.timerBadge}>
             <Ionicons name="time-outline" size={18} color="#ffffff" />
             <Text style={styles.timerText}>{timeLeft}s</Text>
@@ -371,6 +393,19 @@ export default function RequestPage() {
             </View>
           </View>
 
+          {/* Scheduled Time (If applicable) */}
+          {(fullTripData?.service_type === 'Scheduled Pickup' || fullTripData?.service_type === 'Scheduled' || fullTripData?.pickup_time) && (
+            <View style={styles.locationRow}>
+              <View style={[styles.locationIcon, { backgroundColor: colors.primaryLight }]}>
+                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.locationInfo}>
+                <Text style={styles.locationLabel}>Scheduled For</Text>
+                <Text style={styles.locationValue}>{formatScheduleDate(fullTripData?.scheduled_at || fullTripData?.pickup_time)}</Text>
+              </View>
+            </View>
+          )}
+
           {/* Waste Type */}
           <View style={styles.locationRow}>
             <View style={[styles.locationIcon, { backgroundColor: colors.amber[100] }]}>
@@ -419,8 +454,9 @@ export default function RequestPage() {
             <Ionicons name="information-circle-outline" size={18} color={colors.blue[600]} />
           </View>
           <Text style={styles.infoText}>
-            Accepting this request means you commit to picking up the waste
-            within 30 minutes.
+            {(fullTripData?.service_type === 'Scheduled Pickup' || fullTripData?.service_type === 'Scheduled' || fullTripData?.pickup_time) 
+               ? `Accepting this request means you commit to picking up the waste on ${formatScheduleDate(fullTripData?.scheduled_at || fullTripData?.pickup_time)}.`
+               : `Accepting this request means you commit to picking up the waste within 30 minutes.`}
           </Text>
         </View>
       </ScrollView>

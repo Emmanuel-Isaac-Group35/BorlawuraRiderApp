@@ -15,8 +15,8 @@ const mapTrip = (trip: any) => ({
     time: new Date(trip.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     rating: trip.rating || 0,
     status: trip.status,
-    pickupType: trip.pickup_time ? 'Scheduled' : 'Instant',
-    pickupTime: trip.pickup_time,
+    pickupType: (trip.service_type === 'Scheduled Pickup' || trip.service_type === 'Scheduled' || trip.pickup_time) ? 'Scheduled' : 'Instant',
+    pickupTime: trip.scheduled_at || trip.pickup_time,
 });
 
 

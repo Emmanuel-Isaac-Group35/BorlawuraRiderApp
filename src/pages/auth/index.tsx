@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -16,6 +16,10 @@ import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
 
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthPage({ route }: any) {
     const navigation = useNavigation<any>();
@@ -24,6 +28,27 @@ export default function AuthPage({ route }: any) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId: '1049845648210-teccdg7kfr47phs7aoerd3u9aqapsc6r.apps.googleusercontent.com',
+        scopes: ['profile', 'email', 'openid'],
+    });
+
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { authentication } = response;
+            if (authentication?.idToken) {
+                setLoading(true);
+                supabase.auth.signInWithIdToken({
+                    provider: 'google',
+                    token: authentication.idToken,
+                }).then(({ error }) => {
+                    setLoading(false);
+                    if (error) Alert.alert('Google Login Error', error.message);
+                });
+            }
+        }
+    }, [response]);
 
     const handleAuth = async () => {
         if (!email || !password) {
@@ -126,6 +151,21 @@ export default function AuthPage({ route }: any) {
                         <Text style={styles.switchText}>
                             Don't have an account? Sign Up
                         </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.dividerContainer}>
+                        <View style={styles.divider} />
+                        <Text style={styles.dividerText}>OR</Text>
+                        <View style={styles.divider} />
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.googleButton}
+                        onPress={() => promptAsync()}
+                        disabled={!request || loading}
+                    >
+                        <Ionicons name="logo-google" size={20} color="#EA4335" style={{ marginRight: 10 }} />
+                        <Text style={styles.googleButtonText}>Continue with Google</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -230,5 +270,36 @@ const styles = StyleSheet.create({
         color: colors.primary,
         fontSize: 14,
         fontWeight: '600',
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: colors.gray[200],
+    },
+    dividerText: {
+        marginHorizontal: 10,
+        color: colors.gray[500],
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    googleButton: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: colors.gray[200],
+    },
+    googleButtonText: {
+        color: colors.text.primary,
+        fontSize: 16,
+        fontWeight: 'bold',
     },
 });

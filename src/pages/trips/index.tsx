@@ -134,8 +134,12 @@ export default function TripsPage() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Ensure we only show trips with 'completed' status
-    let filtered = allTrips.filter(trip => trip.status === 'completed');
+    // Ensure we only show trips with 'completed' status, EXCEPT for active Scheduled trips which are Upcoming
+    let filtered = allTrips.filter(trip => 
+      trip.status === 'completed' || 
+      (trip.status === 'active' && trip.pickupType === 'Scheduled') ||
+      (trip.status === 'accepted' && trip.pickupType === 'Scheduled')
+    );
 
     if (activeDateFilter === 'today') {
       filtered = filtered.filter(trip => trip.date === todayStr);
@@ -332,9 +336,15 @@ export default function TripsPage() {
                <Text style={styles.tripDate}>{formatDate(item.date)} • {item.time}</Text>
              </View>
           </View>
-          <View style={styles.statusBadge}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
-            <Text style={styles.statusText}>Completed</Text>
+          <View style={[styles.statusBadge, (item.status === 'active' || item.status === 'accepted') ? { backgroundColor: '#DBEAFE' } : {}]}>
+            <Ionicons 
+              name={(item.status === 'active' || item.status === 'accepted') ? 'time' : 'checkmark-circle'} 
+              size={14} 
+              color={(item.status === 'active' || item.status === 'accepted') ? '#2563EB' : colors.primary} 
+            />
+            <Text style={[styles.statusText, (item.status === 'active' || item.status === 'accepted') ? { color: '#1E40AF' } : {}]}>
+              {(item.status === 'active' || item.status === 'accepted') ? 'Upcoming' : 'Completed'}
+            </Text>
           </View>
         </View>
 
@@ -391,10 +401,21 @@ export default function TripsPage() {
              <Ionicons name="document-text-outline" size={18} color={colors.primaryDark} />
              <Text style={styles.primaryActionText}>Trip Details</Text>
            </TouchableOpacity>
-           <TouchableOpacity style={styles.secondaryActionButton} onPress={() => generateReceipt(item)}>
-             <Ionicons name="share-outline" size={18} color={colors.text.secondary} />
-             <Text style={styles.secondaryActionText}>Share Receipt</Text>
-           </TouchableOpacity>
+           
+           {(item.status === 'active' || item.status === 'accepted') ? (
+             <TouchableOpacity 
+               style={[styles.secondaryActionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]} 
+               onPress={() => navigation.navigate('ActiveTrip' as never, { trip: { id: item.id } } as never)}
+             >
+               <Ionicons name="navigate" size={18} color="#fff" />
+               <Text style={[styles.secondaryActionText, { color: '#fff' }]}>Start Trip</Text>
+             </TouchableOpacity>
+           ) : (
+             <TouchableOpacity style={styles.secondaryActionButton} onPress={() => generateReceipt(item)}>
+               <Ionicons name="share-outline" size={18} color={colors.text.secondary} />
+               <Text style={styles.secondaryActionText}>Share Receipt</Text>
+             </TouchableOpacity>
+           )}
         </View>
       </View>
     );
@@ -580,9 +601,15 @@ export default function TripsPage() {
                       <Text style={styles.modalCustomerName}>{selectedTrip.customerName || 'Unknown Customer'}</Text>
                       <Text style={styles.modalDate}>{formatDate(selectedTrip.date)} at {selectedTrip.time}</Text>
                     </View>
-                    <View style={styles.statusBadge}>
-                      <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
-                      <Text style={styles.statusText}>Completed</Text>
+                    <View style={[styles.statusBadge, (selectedTrip.status === 'active' || selectedTrip.status === 'accepted') ? { backgroundColor: '#DBEAFE' } : {}]}>
+                      <Ionicons 
+                        name={(selectedTrip.status === 'active' || selectedTrip.status === 'accepted') ? 'time' : 'checkmark-circle'} 
+                        size={14} 
+                        color={(selectedTrip.status === 'active' || selectedTrip.status === 'accepted') ? '#2563EB' : colors.primary} 
+                      />
+                      <Text style={[styles.statusText, (selectedTrip.status === 'active' || selectedTrip.status === 'accepted') ? { color: '#1E40AF' } : {}]}>
+                        {(selectedTrip.status === 'active' || selectedTrip.status === 'accepted') ? 'Upcoming' : 'Completed'}
+                      </Text>
                     </View>
                  </View>
 
@@ -637,10 +664,26 @@ export default function TripsPage() {
                <TouchableOpacity style={styles.modalPrimaryButton} onPress={() => setDetailsModalVisible(false)}>
                  <Text style={styles.modalPrimaryButtonText}>Close Details</Text>
                </TouchableOpacity>
-               <TouchableOpacity style={[styles.secondaryActionButton, { marginTop: 12 }]} onPress={() => generateReceipt(selectedTrip)}>
-                 <Ionicons name="print-outline" size={18} color={colors.text.secondary} />
-                 <Text style={styles.secondaryActionText}>Print Receipt</Text>
-               </TouchableOpacity>
+               
+               {selectedTrip && (
+                 (selectedTrip.status === 'active' || selectedTrip.status === 'accepted') ? (
+                   <TouchableOpacity 
+                     style={[styles.secondaryActionButton, { marginTop: 12, backgroundColor: colors.primary, borderColor: colors.primary }]} 
+                     onPress={() => {
+                       setDetailsModalVisible(false);
+                       navigation.navigate('ActiveTrip' as never, { trip: { id: selectedTrip.id } } as never);
+                     }}
+                   >
+                     <Ionicons name="navigate" size={18} color="#fff" />
+                     <Text style={[styles.secondaryActionText, { color: '#fff' }]}>Start Trip Tracking</Text>
+                   </TouchableOpacity>
+                 ) : (
+                   <TouchableOpacity style={[styles.secondaryActionButton, { marginTop: 12 }]} onPress={() => generateReceipt(selectedTrip)}>
+                     <Ionicons name="print-outline" size={18} color={colors.text.secondary} />
+                     <Text style={styles.secondaryActionText}>Print Receipt</Text>
+                   </TouchableOpacity>
+                 )
+               )}
              </View>
           </View>
         </BlurView>

@@ -1,7 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { AppState, AppStateStatus, Alert } from 'react-native';
+import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { supabase } from '../lib/supabase';
 import { navigate } from '../navigation/RootNavigation';
 import { Profile } from '../types/supabase';
@@ -12,6 +16,33 @@ Notifications.setNotificationHandler({
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
+});
+
+const BACKGROUND_LOCATION_TASK = 'BACKGROUND_LOCATION_TASK';
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+    if (error) {
+        console.error('Background Location Error:', error);
+        return;
+    }
+    if (data) {
+        const { locations } = data as any;
+        const location = locations[0];
+        if (location) {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    await supabase.from('riders').update({
+                        latitude: location.coords.latitude,
+                        longitude: location.coords.longitude,
+                        updated_at: new Date().toISOString()
+                    }).eq('id', session.user.id).eq('is_online', true);
+                }
+            } catch (e) {
+                console.error("Failed to update background location", e);
+            }
+        }
+    }
 });
 
 type AuthContextType = {
@@ -85,6 +116,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         soundAlerts: true,
         autoAccept: false
     });
+
+    const appState = useRef(AppState.currentState);
 
     useEffect(() => {
         loadSettings();
@@ -226,7 +259,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 async (payload) => {
                     console.log('Global listener: New pending order received!', payload.new);
                     
-                    if (settings.pushNotifications) {
+                    // Only send push notification if the app is minimized (in the background or inactive)
+                    if (settings.pushNotifications && appState.current !== 'active') {
                         try {
                             await Notifications.scheduleNotificationAsync({
                                 content: {
@@ -240,6 +274,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         } catch (e) {
                             console.error('Error triggering local notification:', e);
                         }
+                    } else if (appState.current === 'active') {
+                        // In-App Alert for active foreground state
+                        Alert.alert(
+                            "New Pickup Request! 🚨",
+                            "A new waste pickup request is available near you.",
+                            [
+                                { text: "Ignore", style: "cancel" },
+                                { 
+                                    text: "View Request", 
+                                    onPress: () => {
+                                        supabase.from('orders').select('*').eq('id', payload.new.id).maybeSingle().then(({data: tripData}) => {
+                                           if (tripData) {
+                                              navigate('Request', { trip: tripData });
+                                           }
+                                        });
+                                    }
+                                }
+                            ]
+                        );
                     }
                 }
             )
@@ -266,19 +319,98 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
     }, [user, profile?.is_online, settings.pushNotifications, settings.soundAlerts]);
 
-    // Refresh session on app resume
+    // Track AppState to manage push notifications and session refresh
     useEffect(() => {
-        const handleAppStateChange = (state: string) => {
-            if (state === 'active') {
+        const handleAppStateChange = (nextAppState: AppStateStatus) => {
+            appState.current = nextAppState;
+            if (nextAppState === 'active') {
                 supabase.auth.startAutoRefresh();
             } else {
                 supabase.auth.stopAutoRefresh();
             }
         };
 
-        // There is no AppState listener in this snippet but it's good practice.
-        // For now, let's keep it simple.
-    }, []);
+        const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+        return () => {
+            subscription.remove();
+            
+            // Auto-Offline on App Close (best effort unmount cleanup)
+            if (user) {
+                supabase.from('riders').update({ is_online: false }).eq('id', user.id).then();
+            }
+        };
+    }, [user]);
+
+    // Manage Background Location based on is_online status
+    useEffect(() => {
+        (async () => {
+            if (profile?.is_online) {
+                try {
+                    const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+                    if (fgStatus !== 'granted') return;
+
+                    // Expo Go does not support background location natively and will throw an Info.plist error
+                    const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+                    if (!isExpoGo) {
+                        const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+                        if (bgStatus === 'granted') {
+                            await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+                                accuracy: Location.Accuracy.Balanced,
+                                timeInterval: 15000,
+                                distanceInterval: 50,
+                                showsBackgroundLocationIndicator: true,
+                                foregroundService: {
+                                    notificationTitle: "Borla Wura Rider is online",
+                                    notificationBody: "Tracking location to receive requests",
+                                }
+                            });
+                        }
+                    } else {
+                        console.log("Running in Expo Go: Bypassing background task. Initiating Foreground Polling...");
+                        const foregroundSubscription = await Location.watchPositionAsync(
+                            {
+                                accuracy: Location.Accuracy.Balanced,
+                                timeInterval: 15000,
+                                distanceInterval: 50,
+                            },
+                            async (location) => {
+                                if (user?.id) {
+                                    try {
+                                        await supabase.from('riders').update({
+                                            latitude: location.coords.latitude,
+                                            longitude: location.coords.longitude,
+                                            updated_at: new Date().toISOString()
+                                        }).eq('id', user.id).eq('is_online', true);
+                                    } catch (e) {
+                                        console.error("Foreground location sync failed:", e);
+                                    }
+                                }
+                            }
+                        );
+                        // Save subscription to clear it on cleanup
+                        (global as any).fgLocationSub = foregroundSubscription;
+                    }
+                } catch (e) {
+                    console.error("Error starting background location", e);
+                }
+            } else {
+                try {
+                    if ((global as any).fgLocationSub) {
+                        (global as any).fgLocationSub.remove();
+                        (global as any).fgLocationSub = null;
+                    }
+                    const isTaskDefined = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+                    if (isTaskDefined) {
+                        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+                    }
+                } catch (e) {
+                    console.error("Error stopping background location", e);
+                }
+            }
+        })();
+    }, [profile?.is_online]);
 
     const fetchProfile = async (userId: string) => {
         try {

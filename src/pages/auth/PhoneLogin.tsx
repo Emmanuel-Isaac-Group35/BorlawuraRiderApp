@@ -67,10 +67,13 @@ export default function PhoneLoginPage() {
             const fullPlus233 = `+233${rawPhone}`;
             const simple233 = `233${rawPhone}`;
 
-            const { data: riderData, error: riderError } = await supabase
+            const phoneVariations = [withLeadingZero, withoutLeadingZero, fullPlus233, simple233];
+            
+            let { data: riderData, error: riderError } = await supabase
                 .from('riders')
                 .select('email')
-                .or(`phone.eq.${withLeadingZero},phone.eq.${withoutLeadingZero},phone.eq.${fullPlus233},phone.eq.${simple233}`)
+                .in('phone', phoneVariations)
+                .limit(1)
                 .maybeSingle();
 
             if (riderError) {
@@ -79,6 +82,24 @@ export default function PhoneLoginPage() {
 
             if (!riderError && riderData?.email) {
                 loginEmail = riderData.email;
+            }
+
+            // Fallback to profiles table if not found in riders
+            if (!loginEmail) {
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('email')
+                    .in('phone', phoneVariations)
+                    .limit(1)
+                    .maybeSingle();
+                
+                if (profileError) {
+                    console.error("Supabase profiles query error:", profileError);
+                }
+                
+                if (!profileError && profileData?.email) {
+                    loginEmail = profileData.email;
+                }
             }
 
             if (!loginEmail) {

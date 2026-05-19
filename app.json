@@ -1,62 +1,37 @@
 {
   "expo": {
-    "name": "Borla Wura Rider",
-    "slug": "borlawura-rider",
-    "scheme": "borlawurarider",
+    "name": "BorlawuraRiderApp",
+    "slug": "borlawura-rider-native",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0e3325"
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.borlawura.rider",
-      "config": {
-        "googleMapsApiKey": "AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4"
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow Borlawura to use your location to track rides in the background.",
+        "NSLocationAlwaysUsageDescription": "Allow Borlawura to use your location to track rides in the background.",
+        "NSLocationWhenInUseUsageDescription": "Allow Borlawura to use your location to find nearby rides."
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#10b981"
-      },
-      "package": "com.borlawura.rider",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ],
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4"
-        }
-      }
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "openRouteServiceApiKey": ""
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
     },
     "plugins": [
+      "expo-web-browser",
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Borla Wura Rider to use your location to help you navigate to pickup and disposal locations."
+          "locationAlwaysAndWhenInUsePermission": "Allow Borlawura to use your location.",
+          "locationAlwaysPermission": "Allow Borlawura to use your location to track rides in the background.",
+          "isAndroidBackgroundLocationEnabled": true
         }
-      ],
-      "expo-asset",
-      "expo-font",
-      "expo-audio"
+      ]
     ]
   }
 }

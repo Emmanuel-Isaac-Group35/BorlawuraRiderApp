@@ -17,6 +17,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../utils/colors';
 import { Toast } from '../../components/common/Toast';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -28,6 +30,7 @@ type TabType = 'contact' | 'faq';
 
 export default function SupportPage() {
   const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('contact');
   const [formData, setFormData] = useState({
     name: '',
@@ -77,20 +80,25 @@ export default function SupportPage() {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'You must be logged in to submit a support ticket.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const response = await fetch('https://readdy.ai/api/form/d4iau6qjg2jl50j1sbsg', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            name: formData.name,
-            phone: formData.phone,
-            issue: formData.issue,
-            description: formData.description,
-          } as any).toString(),
+      const { error } = await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'support_ticket',
+        details: {
+          name: formData.name,
+          phone: formData.phone,
+          issue: formData.issue,
+          description: formData.description,
+        }
       });
 
-      if (response.ok) {
+      if (!error) {
         setShowSuccess(true);
         setFormData({ name: '', phone: '', issue: 'trip', description: '' });
         setTimeout(() => setShowSuccess(false), 3000);
