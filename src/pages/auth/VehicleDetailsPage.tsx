@@ -137,7 +137,7 @@ export default function VehicleDetailsPage() {
                 "Application Submitted",
                 "Your registration has been submitted successfully. You can now sign in.",
                 [
-                    { text: "OK", onPress: () => navigation.navigate('Onboarding' as never) }
+                    { text: "OK", onPress: () => navigation.navigate('Auth' as never) }
                 ]
             );
         } catch (error: any) {

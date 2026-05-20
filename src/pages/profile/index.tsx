@@ -12,6 +12,8 @@ import {
   Alert,
   Linking,
   ActivityIndicator as RNActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -398,32 +400,36 @@ export default function ProfilePage() {
 
       {/* Edit Profile Modal */}
       <Modal visible={showEditModal} onClose={() => setShowEditModal(false)}>
-        <Text style={styles.modalTitle}>Update Profile</Text>
-        <View style={styles.modalFormWrapper}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
-            <TextInput style={styles.inputField} value={editForm.name} onChangeText={t => setEditForm({...editForm, name: t})} />
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <View>
+            <Text style={styles.modalTitle}>Update Profile</Text>
+            <View style={styles.modalFormWrapper}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput style={styles.inputField} value={editForm.name} onChangeText={t => setEditForm({...editForm, name: t})} />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput style={styles.inputField} value={editForm.phone} keyboardType="phone-pad" onChangeText={t => setEditForm({...editForm, phone: t})} />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <TextInput style={styles.inputField} value={editForm.email || ''} keyboardType="email-address" onChangeText={t => setEditForm({...editForm, email: t})} />
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={[styles.saveBtn, saving && { opacity: 0.7 }]} 
+              onPress={handleSaveProfile}
+              disabled={saving}
+            >
+              {saving ? (
+                <RNActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save</Text>
+              )}
+            </TouchableOpacity>
           </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Phone Number</Text>
-            <TextInput style={styles.inputField} value={editForm.phone} keyboardType="phone-pad" onChangeText={t => setEditForm({...editForm, phone: t})} />
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <TextInput style={styles.inputField} value={editForm.email || ''} keyboardType="email-address" onChangeText={t => setEditForm({...editForm, email: t})} />
-          </View>
-        </View>
-        <TouchableOpacity 
-          style={[styles.saveBtn, saving && { opacity: 0.7 }]} 
-          onPress={handleSaveProfile}
-          disabled={saving}
-        >
-          {saving ? (
-            <RNActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Text style={styles.saveBtnText}>Save</Text>
-          )}
-        </TouchableOpacity>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Terms & Conditions Modal */}

@@ -60,6 +60,7 @@ type AuthContextType = {
         autoAccept: boolean;
     };
     updateSettings: (key: 'pushNotifications' | 'soundAlerts' | 'autoAccept', value: boolean) => Promise<void>;
+    hasRegisteredBefore: boolean;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -87,7 +88,8 @@ const AuthContext = createContext<AuthContextType>({
         soundAlerts: true,
         autoAccept: false
     },
-    updateSettings: async () => { }
+    updateSettings: async () => { },
+    hasRegisteredBefore: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -116,6 +118,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         soundAlerts: true,
         autoAccept: false
     });
+    const [hasRegisteredBefore, setHasRegisteredBefore] = useState(false);
 
     const appState = useRef(AppState.currentState);
 
@@ -145,12 +148,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const pn = await AsyncStorage.getItem('pushNotifications');
             const sa = await AsyncStorage.getItem('soundAlerts');
             const aa = await AsyncStorage.getItem('autoAccept');
+            const hr = await AsyncStorage.getItem('hasRegisteredBefore');
 
             setSettings({
                 pushNotifications: pn !== null ? pn === 'true' : true,
                 soundAlerts: sa !== null ? sa === 'true' : true,
                 autoAccept: aa !== null ? aa === 'true' : false
             });
+            setHasRegisteredBefore(hr === 'true');
         } catch (e) {
             console.error('Failed to load settings:', e);
         }
@@ -424,6 +429,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 console.error('Error fetching profile:', error);
             } else {
                 setProfile(data);
+                if (data) {
+                    setHasRegisteredBefore(true);
+                    AsyncStorage.setItem('hasRegisteredBefore', 'true').catch(e => console.error(e));
+                }
             }
         } catch (err) {
             console.error('Unexpected error fetching profile:', err);
@@ -451,7 +460,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             registrationData,
             updateRegistrationData,
             settings,
-            updateSettings
+            updateSettings,
+            hasRegisteredBefore
         }}>
             {children}
         </AuthContext.Provider>

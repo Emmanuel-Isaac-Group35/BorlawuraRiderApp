@@ -13,6 +13,7 @@ import RequestPage from '../pages/request';
 import ActiveTripPage from '../pages/active-trip';
 import TripCompletePage from '../pages/trip-complete';
 import SupportPage from '../pages/support';
+import ChatPage from '../pages/chat';
 import NotFound from '../pages/NotFound';
 import AuthPage from '../pages/auth';
 import AuditLogsPage from '../pages/audit-logs';
@@ -132,6 +133,7 @@ export function AppNavigator() {
             <Stack.Screen name="MainTabs" component={MainTabs} />
             <Stack.Screen name="Request" component={RequestPage} />
             <Stack.Screen name="ActiveTrip" component={ActiveTripPage} />
+            <Stack.Screen name="Chat" component={ChatPage} />
             <Stack.Screen name="Tracking" component={TrackingPage} />
             <Stack.Screen name="TripComplete" component={TripCompletePage} />
             <Stack.Screen name="Support" component={SupportPage} />

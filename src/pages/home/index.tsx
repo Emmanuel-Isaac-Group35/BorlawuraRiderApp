@@ -325,17 +325,26 @@ export default function HomePage() {
             // Auto-Accept Logic
             if (settings.autoAccept) {
                try {
-                 await supabase
+                 const { data, error } = await supabase
                    .from('orders')
                    .update({ 
                      rider_id: user.id, 
                      status: 'accepted',
                      accepted_at: new Date().toISOString() 
                    })
-                   .eq('id', payload.new.id);
+                   .eq('id', payload.new.id)
+                   .is('rider_id', null)
+                   .select();
                  
-                 navigation.navigate('ActiveTrip' as never, { trip: enrichedTrip } as never);
-                 return;
+                 if (error) throw error;
+
+                 if (data && data.length > 0) {
+                   navigation.navigate('ActiveTrip' as never, { trip: enrichedTrip } as never);
+                   return;
+                 } else {
+                   console.log('Auto-accept skipped: order already taken.');
+                   return;
+                 }
                } catch (e) {
                  console.error('Auto-accept failed:', e);
                }

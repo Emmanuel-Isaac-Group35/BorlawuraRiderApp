@@ -263,10 +263,14 @@ export default function ActiveTripPage() {
       if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'driving_to_pickup' }).eq('id', dbTrip.id);
     } else if (currentStatus === 'driving_to_pickup') {
       setCurrentStatus('arrived_at_pickup');
-      if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id);
+      if (dbTrip?.id) {
+        await supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id);
+      }
     } else if (currentStatus === 'arrived_at_pickup') {
       setCurrentStatus('waste_collected');
-      if (dbTrip?.id) await supabase.from('orders').update({ sub_status: 'waste_collected' }).eq('id', dbTrip.id);
+      if (dbTrip?.id) {
+        await supabase.from('orders').update({ sub_status: 'waste_collected' }).eq('id', dbTrip.id);
+      }
     } else if (currentStatus === 'waste_collected') {
       if (dbTrip?.id) {
         await supabase.from('orders').update({ 
@@ -482,7 +486,10 @@ export default function ActiveTripPage() {
               </View>
 
               <View style={styles.uberActionRow}>
-                <TouchableOpacity style={styles.uberChatBtn} onPress={handleCall}>
+                <TouchableOpacity style={styles.uberChatBtn} onPress={() => navigation.navigate('Chat' as never, { trip: dbTrip || trip } as never)}>
+                  <Ionicons name="chatbubble" size={24} color="#000" />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.uberChatBtn, { marginLeft: 8 }]} onPress={handleCall}>
                   <Ionicons name="call" size={24} color="#000" />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>

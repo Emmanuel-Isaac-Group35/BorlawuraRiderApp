@@ -31,7 +31,7 @@ export default function PhoneLoginPage() {
     };
 
     const handleClose = () => {
-        navigation.navigate('Onboarding' as never);
+        navigation.navigate('Auth' as never);
     };
 
     const handleLogin = async () => {

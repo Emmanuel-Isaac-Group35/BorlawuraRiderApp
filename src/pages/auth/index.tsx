@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
+import { useAuth } from '../../contexts/AuthContext';
 
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -23,6 +24,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthPage({ route }: any) {
     const navigation = useNavigation<any>();
+    const { hasRegisteredBefore } = useAuth();
     const { isLogin: initialIsLogin = true } = route.params || {};
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -31,6 +33,7 @@ export default function AuthPage({ route }: any) {
 
     const [request, response, promptAsync] = Google.useAuthRequest({
         androidClientId: '1049845648210-teccdg7kfr47phs7aoerd3u9aqapsc6r.apps.googleusercontent.com',
+        iosClientId: '1049845648210-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com', // TODO: Replace with your actual iOS Client ID from Google Cloud Console
         scopes: ['profile', 'email', 'openid'],
     });
 
@@ -144,14 +147,16 @@ export default function AuthPage({ route }: any) {
                         )}
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.switchButton}
-                        onPress={() => navigation.navigate('Register')}
-                    >
-                        <Text style={styles.switchText}>
-                            Don't have an account? Sign Up
-                        </Text>
-                    </TouchableOpacity>
+                    {!hasRegisteredBefore && (
+                        <TouchableOpacity
+                            style={styles.switchButton}
+                            onPress={() => navigation.navigate('Register')}
+                        >
+                            <Text style={styles.switchText}>
+                                Don't have an account? Sign Up
+                            </Text>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={styles.dividerContainer}>
                         <View style={styles.divider} />

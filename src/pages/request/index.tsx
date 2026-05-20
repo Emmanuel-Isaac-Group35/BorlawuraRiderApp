@@ -205,7 +205,7 @@ export default function RequestPage() {
     }
   }, [timeLeft, isAccepting]);
 
-  // Listen for user cancellation during the request ring
+  // Listen for user cancellation or if another rider accepts it during the request ring
   useEffect(() => {
     if (!fullTripData?.id) return;
     const cancelSubscription = supabase
@@ -222,6 +222,10 @@ export default function RequestPage() {
           if (payload.new.status === 'cancelled') {
              Alert.alert('Request Cancelled', 'The customer just cancelled this pickup request.');
              handleDecline(false); // don't penalize rider
+          } else if (payload.new.rider_id && payload.new.rider_id !== user?.id) {
+             // Another rider accepted it first
+             Alert.alert('Missed It!', 'Another rider was faster and already accepted this request.');
+             handleDecline(false); // don't penalize rider
           }
         }
       )
@@ -230,7 +234,7 @@ export default function RequestPage() {
     return () => {
       supabase.removeChannel(cancelSubscription);
     };
-  }, [fullTripData?.id]);
+  }, [fullTripData?.id, user?.id]);
 
 
   const handleAccept = async () => {
@@ -239,7 +243,8 @@ export default function RequestPage() {
     try {
       if (trip?.id && user?.id) {
         // Update trip status in database to 'active' and assign to rider
-        const { error } = await supabase
+        // Use .is('rider_id', null) to prevent overwriting another rider who accepted it first
+        const { data, error } = await supabase
           .from('orders')
           .update({ 
              status: 'active',
@@ -247,11 +252,20 @@ export default function RequestPage() {
              rider_id: user.id,
              accepted_at: new Date().toISOString()
           })
-          .eq('id', trip.id);
+          .eq('id', trip.id)
+          .is('rider_id', null)
+          .select();
         
         if (error) {
            console.error("Supabase Order Update Error:", error);
            throw error;
+        }
+
+        if (!data || data.length === 0) {
+           Alert.alert('Missed It!', 'Another rider was faster and already accepted this request.');
+           setIsAccepting(false);
+           handleDecline(false);
+           return;
         }
       }
 
