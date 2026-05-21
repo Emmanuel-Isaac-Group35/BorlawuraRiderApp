@@ -5,6 +5,10 @@ import { colors } from '../../utils/colors';
 
 const { width } = Dimensions.get('window');
 
+const THUMB_WIDTH = 60;
+const THUMB_SIDE_PADDING = 5;
+const TEXT_SIDE_INSET = 12;
+
 interface SwipeButtonProps {
   title: string;
   onSwipeComplete: () => void;
@@ -28,12 +32,11 @@ export const SwipeButton = ({ title, onSwipeComplete, containerStyle }: SwipeBut
 
   const [containerWidth, setContainerWidth] = useState(width - 48);
 
-  const thumbWidth = 60;
-  const maxSwipeRef = useRef(Math.max(0, containerWidth - thumbWidth - 10));
+  const maxSwipeRef = useRef(Math.max(0, containerWidth - THUMB_WIDTH - 10));
 
   // Keep maxSwipeRef updated whenever containerWidth changes
   React.useEffect(() => {
-    maxSwipeRef.current = Math.max(0, containerWidth - thumbWidth - 10);
+    maxSwipeRef.current = Math.max(0, containerWidth - THUMB_WIDTH - 10);
   }, [containerWidth]);
 
   const panResponder = useRef(
@@ -81,7 +84,14 @@ export const SwipeButton = ({ title, onSwipeComplete, containerStyle }: SwipeBut
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
     >
       <View style={styles.textContainer}>
-        <Text style={styles.title}>{completed ? 'Done!' : title}</Text>
+        <Text
+          style={styles.title}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+        >
+          {completed ? 'Done!' : title}
+        </Text>
       </View>
       <Animated.View
         style={[
@@ -110,18 +120,25 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     position: 'absolute',
-    width: '100%',
+    top: 0,
+    bottom: 0,
+    left: THUMB_WIDTH + THUMB_SIDE_PADDING + TEXT_SIDE_INSET,
+    right: TEXT_SIDE_INSET,
+    justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
+    pointerEvents: 'none',
   },
   title: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: '700',
     letterSpacing: 0.5,
+    textAlign: 'center',
+    width: '100%',
   },
   thumb: {
-    width: 60,
+    width: THUMB_WIDTH,
     height: 50,
     borderRadius: 25,
     backgroundColor: '#fff',
