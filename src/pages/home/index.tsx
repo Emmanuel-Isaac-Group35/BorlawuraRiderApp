@@ -40,8 +40,6 @@ export default function HomePage() {
   const navigation = useNavigation<NavigationProp>();
   const { profile, user, settings } = useAuth();
   const [stats, setStats] = useState({
-    todayEarnings: 0,
-    weeklyEarnings: 0,
     todayTrips: 0,
     rating: 5.0,
     totalTrips: 0,
@@ -626,29 +624,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
-  },
-  earningsPill: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  earningsValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#000',
-  },
-  earningsLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    fontWeight: '500',
-    marginTop: -2,
   },
   controlsArea: {
     justifyContent: 'flex-end',

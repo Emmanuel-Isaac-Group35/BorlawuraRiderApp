@@ -8,7 +8,6 @@ export default function BottomNav() {
   const navItems = [
     { path: '/', icon: 'ri-home', label: 'Home' },
     { path: '/trips', icon: 'ri-route', label: 'Trips' },
-    { path: '/earnings', icon: 'ri-wallet', label: 'Earnings' },
     { path: '/profile', icon: 'ri-user', label: 'Profile' },
   ];
 

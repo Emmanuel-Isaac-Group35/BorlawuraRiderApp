@@ -109,15 +109,14 @@ export const fetchTrips = async (userId: string) => {
 export const fetchStats = async (userId: string) => {
     const today = new Date().toISOString().split('T')[0];
     
-    // Fetch today's earnings and count locally for accuracy
+    // Fetch today's trips count locally for accuracy
     const { data: todayTrips } = await supabase
         .from('orders')
-        .select('amount')
+        .select('id')
         .eq('rider_id', userId)
         .eq('status', 'completed')
         .gte('created_at', `${today}T00:00:00`);
 
-    const todayEarnings = todayTrips?.reduce((sum, trip) => sum + (trip.amount || 0), 0) || 0;
     const todayTripsCount = todayTrips?.length || 0;
 
     // Fetch ALL time COMPLETED trips
@@ -144,8 +143,6 @@ export const fetchStats = async (userId: string) => {
         : 100;
 
     return {
-        todayEarnings,
-        weeklyEarnings: 0, // Simplified for now since we focus on trip counts
         todayTrips: todayTripsCount,
         totalTrips: totalTrips,
         acceptanceRate: acceptanceRate,

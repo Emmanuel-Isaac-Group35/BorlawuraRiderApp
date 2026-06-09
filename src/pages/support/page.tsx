@@ -21,10 +21,6 @@ export default function SupportPage() {
       answer: 'When you receive a new pickup request, you\'ll see a notification with trip details. Review the information and tap "Accept" within 15 seconds to confirm the trip.'
     },
     {
-      question: 'How long does it take to receive my earnings?',
-      answer: 'Withdrawals to Mobile Money are processed instantly. You can withdraw your available balance anytime from the Earnings page.'
-    },
-    {
       question: 'What should I do if the customer is not available?',
       answer: 'Try calling or messaging the customer through the app. If they don\'t respond after 10 minutes, contact support and we\'ll help resolve the issue.'
     },
