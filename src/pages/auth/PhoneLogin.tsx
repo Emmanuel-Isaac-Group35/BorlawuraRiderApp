@@ -71,7 +71,7 @@ export default function PhoneLoginPage() {
             
             let { data: riderData, error: riderError } = await supabase
                 .from('riders')
-                .select('email')
+                .select('email, status')
                 .in('phone', phoneVariations)
                 .limit(1)
                 .maybeSingle();
@@ -81,6 +81,9 @@ export default function PhoneLoginPage() {
             }
 
             if (!riderError && riderData?.email) {
+                if (riderData.status === 'suspended') {
+                    throw new Error("Your account is suspended. Please contact support.");
+                }
                 loginEmail = riderData.email;
             }
 
@@ -88,7 +91,7 @@ export default function PhoneLoginPage() {
             if (!loginEmail) {
                 const { data: profileData, error: profileError } = await supabase
                     .from('profiles')
-                    .select('email')
+                    .select('email, status')
                     .in('phone', phoneVariations)
                     .limit(1)
                     .maybeSingle();
@@ -98,6 +101,9 @@ export default function PhoneLoginPage() {
                 }
                 
                 if (!profileError && profileData?.email) {
+                    if (profileData.status === 'suspended') {
+                        throw new Error("Your account is suspended. Please contact support.");
+                    }
                     loginEmail = profileData.email;
                 }
             }

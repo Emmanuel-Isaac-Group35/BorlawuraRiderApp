@@ -236,7 +236,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 },
                 (payload) => {
                     console.log('Real-time rider profile update:', payload.new);
-                    setProfile(payload.new as Profile);
+                    const newProfile = payload.new as Profile;
+                    if (newProfile.status === 'suspended') {
+                        Alert.alert(
+                            'Account Suspended', 
+                            'Your account has been suspended by an administrator. Please contact support.',
+                            [
+                                { text: 'OK', onPress: () => supabase.auth.signOut() }
+                            ],
+                            { cancelable: false }
+                        );
+                    } else {
+                        setProfile(newProfile);
+                    }
                 }
             )
             .subscribe();
@@ -428,6 +440,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (error) {
                 console.error('Error fetching profile:', error);
             } else {
+                if (data?.status === 'suspended') {
+                    Alert.alert(
+                        'Account Suspended', 
+                        'Your account has been suspended by an administrator. Please contact support.',
+                        [
+                            { text: 'OK', onPress: () => supabase.auth.signOut() }
+                        ],
+                        { cancelable: false }
+                    );
+                    return;
+                }
                 setProfile(data);
                 if (data) {
                     setHasRegisteredBefore(true);

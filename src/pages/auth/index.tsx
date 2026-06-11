@@ -64,11 +64,24 @@ export default function AuthPage({ route }: any) {
         const trimmedPassword = password.trim();
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email: trimmedEmail,
                 password: trimmedPassword,
             });
             if (error) throw error;
+            
+            if (data?.user) {
+                const { data: profile } = await supabase
+                    .from('riders')
+                    .select('status')
+                    .eq('id', data.user.id)
+                    .maybeSingle();
+                    
+                if (profile?.status === 'suspended') {
+                    await supabase.auth.signOut();
+                    throw new Error("Your account is suspended. Please contact support.");
+                }
+            }
         } catch (error: any) {
             Alert.alert('Error', error.message);
         } finally {
