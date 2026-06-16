@@ -21,6 +21,13 @@ export default function PersonalInfoPage() {
     const { updateRegistrationData } = useAuth();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
+<<<<<<< HEAD
+=======
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
     const [languages, setLanguages] = useState<string[]>(['English']);
     const [showLangModal, setShowLangModal] = useState(false);
 
@@ -117,8 +124,69 @@ export default function PersonalInfoPage() {
                             style={styles.input}
                             value={lastName}
                             onChangeText={setLastName}
+<<<<<<< HEAD
                             placeholder="e.g. Doe"
                         />
+=======
+                        />
+                        <Text style={styles.errorText}>This field is required</Text>
+                    </View>
+
+                    {/* Password */}
+                    <View style={styles.inputGroup}>
+                        <View style={styles.labelRow}>
+                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.requiredStar}>*</Text>
+                        </View>
+                        <View style={styles.passwordInputWrapper}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, borderWidth: 0 }]}
+                                value={password}
+                                onChangeText={setPassword}
+                                placeholder="Min. 6 characters"
+                                placeholderTextColor="#9ca3af"
+                                secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity 
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons 
+                                    name={showPassword ? "eye-off" : "eye"} 
+                                    size={20} 
+                                    color="#9ca3af" 
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Confirm Password */}
+                    <View style={styles.inputGroup}>
+                        <View style={styles.labelRow}>
+                            <Text style={styles.label}>Confirm Password</Text>
+                            <Text style={styles.requiredStar}>*</Text>
+                        </View>
+                        <View style={styles.passwordInputWrapper}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, borderWidth: 0 }]}
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                placeholder="Re-enter password"
+                                placeholderTextColor="#9ca3af"
+                                secureTextEntry={!showConfirmPassword}
+                            />
+                            <TouchableOpacity 
+                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons 
+                                    name={showConfirmPassword ? "eye-off" : "eye"} 
+                                    size={20} 
+                                    color="#9ca3af" 
+                                />
+                            </TouchableOpacity>
+                        </View>
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
                     </View>
 
                     {/* Language */}
@@ -301,6 +369,16 @@ const styles = StyleSheet.create({
         padding: 12,
         fontSize: 16,
         color: '#000',
+    },
+    passwordInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+    },
+    eyeIcon: {
+        padding: 12,
     },
     inputError: {
         borderColor: '#ef4444',

@@ -14,6 +14,7 @@ import RequestPage from '../pages/request';
 import ActiveTripPage from '../pages/active-trip';
 import TripCompletePage from '../pages/trip-complete';
 import SupportPage from '../pages/support';
+import ChatPage from '../pages/chat';
 import NotFound from '../pages/NotFound';
 import SettingsPage from '../pages/profile/SettingsPage';
 import AuthPage from '../pages/auth';
@@ -27,6 +28,8 @@ import PersonalInfoPage from '../pages/auth/PersonalInfoPage';
 import DriverLicensePage from '../pages/auth/DriverLicensePage';
 import DocumentsPage from '../pages/auth/DocumentsPage';
 import VehicleDetailsPage from '../pages/auth/VehicleDetailsPage';
+import ForgotPasswordPage from '../pages/auth/ForgotPassword';
+import { NetworkBanner } from '../components/common/NetworkBanner';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -106,6 +109,7 @@ export function AppNavigator() {
   }
 
   return (
+<<<<<<< HEAD
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
@@ -140,6 +144,43 @@ export function AppNavigator() {
         </>
       )}
     </Stack.Navigator>
+=======
+    <>
+      <NetworkBanner />
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+        }}
+      >
+        {!session ? (
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingPage} />
+            <Stack.Screen name="Auth" component={AuthPage} />
+            <Stack.Screen name="PhoneLogin" component={PhoneLoginPage} />
+            <Stack.Screen name="Register" component={RegisterPage} />
+            <Stack.Screen name="PersonalInfo" component={PersonalInfoPage} />
+            <Stack.Screen name="DriverLicense" component={DriverLicensePage} />
+            <Stack.Screen name="Documents" component={DocumentsPage} />
+            <Stack.Screen name="VehicleDetails" component={VehicleDetailsPage} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordPage} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen name="Request" component={RequestPage} />
+            <Stack.Screen name="ActiveTrip" component={ActiveTripPage} />
+            <Stack.Screen name="Chat" component={ChatPage} />
+            <Stack.Screen name="Tracking" component={TrackingPage} />
+            <Stack.Screen name="TripComplete" component={TripCompletePage} />
+            <Stack.Screen name="Support" component={SupportPage} />
+            <Stack.Screen name="AuditLogs" component={AuditLogsPage} />
+            <Stack.Screen name="NotFound" component={NotFound} />
+          </>
+        )}
+      </Stack.Navigator>
+    </>
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
   );
 }
 

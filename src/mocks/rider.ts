@@ -15,18 +15,6 @@ export const riderProfile = {
   }
 };
 
-export const todayEarnings = {
-  total: 145.50,
-  trips: 8,
-  bonus: 15.00
-};
-
-export const weeklyEarnings = {
-  total: 892.30,
-  trips: 47,
-  bonus: 45.00
-};
-
 export const tripHistory = [
   {
     id: "TRP-001",

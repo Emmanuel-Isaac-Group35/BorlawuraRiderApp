@@ -8,6 +8,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import i18n from './src/i18n';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { AppNavigator } from './src/navigation';
+<<<<<<< HEAD
 import { StyleSheet, ActivityIndicator, View } from 'react-native';
 import { 
   useFonts,
@@ -21,6 +22,15 @@ import {
   Montserrat_800ExtraBold,
   Montserrat_900Black 
 } from '@expo-google-fonts/montserrat';
+=======
+import { navigationRef } from './src/navigation/RootNavigation';
+import { StyleSheet, LogBox } from 'react-native';
+
+LogBox.ignoreLogs([
+  '`expo-notifications` functionality is not fully supported',
+  '[expo-av]: Expo AV has been deprecated',
+]);
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -48,7 +58,7 @@ export default function App() {
       <SafeAreaProvider>
         <I18nextProvider i18n={i18n}>
           <AuthProvider>
-            <NavigationContainer>
+            <NavigationContainer ref={navigationRef}>
               <AppNavigator />
               <StatusBar style="light" />
             </NavigationContainer>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,13 +14,44 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../utils/colors';
+import { useAuth } from '../../contexts/AuthContext';
+
+import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthPage({ route }: any) {
     const navigation = useNavigation<any>();
+    const { hasRegisteredBefore } = useAuth();
     const { isLogin: initialIsLogin = true } = route.params || {};
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId: '1049845648210-teccdg7kfr47phs7aoerd3u9aqapsc6r.apps.googleusercontent.com',
+        iosClientId: '1049845648210-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com', // TODO: Replace with your actual iOS Client ID from Google Cloud Console
+        scopes: ['profile', 'email', 'openid'],
+    });
+
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { authentication } = response;
+            if (authentication?.idToken) {
+                setLoading(true);
+                supabase.auth.signInWithIdToken({
+                    provider: 'google',
+                    token: authentication.idToken,
+                }).then(({ error }) => {
+                    setLoading(false);
+                    if (error) Alert.alert('Google Login Error', error.message);
+                });
+            }
+        }
+    }, [response]);
 
     const handleAuth = async () => {
         if (!email || !password) {
@@ -33,11 +64,24 @@ export default function AuthPage({ route }: any) {
         const trimmedPassword = password.trim();
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email: trimmedEmail,
                 password: trimmedPassword,
             });
             if (error) throw error;
+            
+            if (data?.user) {
+                const { data: profile } = await supabase
+                    .from('riders')
+                    .select('status')
+                    .eq('id', data.user.id)
+                    .maybeSingle();
+                    
+                if (profile?.status === 'suspended') {
+                    await supabase.auth.signOut();
+                    throw new Error("Your account is suspended. Please contact support.");
+                }
+            }
         } catch (error: any) {
             Alert.alert('Error', error.message);
         } finally {
@@ -76,14 +120,33 @@ export default function AuthPage({ route }: any) {
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Password</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="••••••••"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                        />
+                        <View style={styles.passwordInputWrapper}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, borderWidth: 0 }]}
+                                placeholder="••••••••"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity 
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons 
+                                    name={showPassword ? "eye-off" : "eye"} 
+                                    size={20} 
+                                    color={colors.gray[400]} 
+                                />
+                            </TouchableOpacity>
+                        </View>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.forgotPasswordButton}
+                        onPress={() => navigation.navigate('ForgotPassword')}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.button}
@@ -97,13 +160,30 @@ export default function AuthPage({ route }: any) {
                         )}
                     </TouchableOpacity>
 
+                    {!hasRegisteredBefore && (
+                        <TouchableOpacity
+                            style={styles.switchButton}
+                            onPress={() => navigation.navigate('Register')}
+                        >
+                            <Text style={styles.switchText}>
+                                Don't have an account? Sign Up
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+
+                    <View style={styles.dividerContainer}>
+                        <View style={styles.divider} />
+                        <Text style={styles.dividerText}>OR</Text>
+                        <View style={styles.divider} />
+                    </View>
+
                     <TouchableOpacity
-                        style={styles.switchButton}
-                        onPress={() => navigation.navigate('Register')}
+                        style={styles.googleButton}
+                        onPress={() => promptAsync()}
+                        disabled={!request || loading}
                     >
-                        <Text style={styles.switchText}>
-                            Don't have an account? Sign Up
-                        </Text>
+                        <Ionicons name="logo-google" size={20} color="#EA4335" style={{ marginRight: 10 }} />
+                        <Text style={styles.googleButtonText}>Continue with Google</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -168,6 +248,26 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: colors.text.primary,
     },
+    passwordInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.gray[50],
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.gray[200],
+    },
+    eyeIcon: {
+        padding: 12,
+    },
+    forgotPasswordButton: {
+        alignSelf: 'flex-end',
+        marginBottom: 16,
+    },
+    forgotPasswordText: {
+        color: colors.primary,
+        fontSize: 14,
+        fontWeight: '600',
+    },
     button: {
         backgroundColor: colors.primary,
         borderRadius: 12,
@@ -188,5 +288,36 @@ const styles = StyleSheet.create({
         color: colors.primary,
         fontSize: 14,
         fontWeight: '600',
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: colors.gray[200],
+    },
+    dividerText: {
+        marginHorizontal: 10,
+        color: colors.gray[500],
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    googleButton: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: colors.gray[200],
+    },
+    googleButtonText: {
+        color: colors.text.primary,
+        fontSize: 16,
+        fontWeight: 'bold',
     },
 });

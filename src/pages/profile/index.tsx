@@ -9,8 +9,18 @@ import {
   Alert,
   StatusBar,
   TextInput,
+<<<<<<< HEAD
   Modal,
   ActivityIndicator,
+=======
+  Image,
+  Switch,
+  Alert,
+  Linking,
+  ActivityIndicator as RNActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -84,6 +94,7 @@ export default function ProfilePage() {
               </TouchableOpacity>
            </View>
 
+<<<<<<< HEAD
            <View style={styles.settingsSection}>
               <Text style={styles.sectionTitle}>ACCOUNT AUTHENTICATION</Text>
               {renderSettingItem('shield-checkmark-outline', 'Security Protocol', 'Encryption and access keys', () => {})}
@@ -98,6 +109,57 @@ export default function ProfilePage() {
                  <Ionicons name="power-outline" size={24} color="#EF4444" />
               </TouchableOpacity>
            </View>
+=======
+        <Text style={styles.versionText}>Borlawura Rider App v1.0.0</Text>
+      </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={showEditModal} onClose={() => setShowEditModal(false)}>
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <View>
+            <Text style={styles.modalTitle}>Update Profile</Text>
+            <View style={styles.modalFormWrapper}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput style={styles.inputField} value={editForm.name} onChangeText={t => setEditForm({...editForm, name: t})} />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput style={styles.inputField} value={editForm.phone} keyboardType="phone-pad" onChangeText={t => setEditForm({...editForm, phone: t})} />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <TextInput style={styles.inputField} value={editForm.email || ''} keyboardType="email-address" onChangeText={t => setEditForm({...editForm, email: t})} />
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={[styles.saveBtn, saving && { opacity: 0.7 }]} 
+              onPress={handleSaveProfile}
+              disabled={saving}
+            >
+              {saving ? (
+                <RNActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Terms & Conditions Modal */}
+      <Modal visible={showTermsModal} onClose={() => setShowTermsModal(false)}>
+        <Text style={styles.modalTitle}>Terms & Conditions</Text>
+        <ScrollView style={styles.policyScroll} showsVerticalScrollIndicator={false}>
+          <Text style={styles.policyText}>
+            Welcome to the Borlawura Rider App. By accessing or using this platform, you agree to be bound by the following terms:{"\n\n"}
+            <Text style={{fontWeight: '700'}}>1. Service Obligations:</Text> As a verified rider, you commit to completing all accepted waste collection requests safely and efficiently. Punctuality and professional conduct are strictly required.{"\n\n"}
+            <Text style={{fontWeight: '700'}}>2. Vehicle Eligibility:</Text> You are required to keep your registered tricycle well-maintained, insured, and thoroughly inspected. You are fully responsible for all direct operational and maintenance costs.{"\n\n"}
+            <Text style={{fontWeight: '700'}}>3. Fair Usage & Platform Safety:</Text> Do not manipulate the Borlawura system or forge completion certificates. Any misrepresentation will result in immediate suspension or total account termination.{"\n\n"}
+            <Text style={{fontWeight: '700'}}>4. Financial Transactions:</Text> All fares are calculated based on distance and type of waste. A standard platform commission applies to all completed trips, and payouts are securely executed to your provided Mobile Money account.{"\n\n"}
+            By continuing to access the Borlawura network, you signify that you consent to all present and future modifications made to these terms.
+          </Text>
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
         </ScrollView>
       </SafeAreaView>
 

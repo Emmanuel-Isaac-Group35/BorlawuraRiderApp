@@ -3,7 +3,6 @@ import type { RouteObject } from 'react-router-dom';
 
 const HomePage = lazy(() => import('../pages/home/page'));
 const TripsPage = lazy(() => import('../pages/trips/page'));
-const EarningsPage = lazy(() => import('../pages/earnings/page'));
 const ProfilePage = lazy(() => import('../pages/profile/page'));
 const RequestPage = lazy(() => import('../pages/request/page'));
 const ActiveTripPage = lazy(() => import('../pages/active-trip/page'));
@@ -19,10 +18,6 @@ const routes: RouteObject[] = [
   {
     path: '/trips',
     element: <TripsPage />,
-  },
-  {
-    path: '/earnings',
-    element: <EarningsPage />,
   },
   {
     path: '/profile',

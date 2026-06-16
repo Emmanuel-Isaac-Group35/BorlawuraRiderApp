@@ -23,6 +23,7 @@ export default function PhoneLoginPage() {
     const [password, setPassword] = useState('');
     const [isFocused, setIsFocused] = useState(false);
     const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const handleBack = () => {
@@ -30,7 +31,7 @@ export default function PhoneLoginPage() {
     };
 
     const handleClose = () => {
-        navigation.navigate('Onboarding' as never);
+        navigation.navigate('Auth' as never);
     };
 
     const handleLogin = async () => {
@@ -66,10 +67,13 @@ export default function PhoneLoginPage() {
             const fullPlus233 = `+233${rawPhone}`;
             const simple233 = `233${rawPhone}`;
 
-            const { data: riderData, error: riderError } = await supabase
+            const phoneVariations = [withLeadingZero, withoutLeadingZero, fullPlus233, simple233];
+            
+            let { data: riderData, error: riderError } = await supabase
                 .from('riders')
-                .select('email')
-                .or(`phone.eq.${withLeadingZero},phone.eq.${withoutLeadingZero},phone.eq.${fullPlus233},phone.eq.${simple233}`)
+                .select('email, status')
+                .in('phone', phoneVariations)
+                .limit(1)
                 .maybeSingle();
 
             if (riderError) {
@@ -77,7 +81,31 @@ export default function PhoneLoginPage() {
             }
 
             if (!riderError && riderData?.email) {
+                if (riderData.status === 'suspended') {
+                    throw new Error("Your account is suspended. Please contact support.");
+                }
                 loginEmail = riderData.email;
+            }
+
+            // Fallback to profiles table if not found in riders
+            if (!loginEmail) {
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('email, status')
+                    .in('phone', phoneVariations)
+                    .limit(1)
+                    .maybeSingle();
+                
+                if (profileError) {
+                    console.error("Supabase profiles query error:", profileError);
+                }
+                
+                if (!profileError && profileData?.email) {
+                    if (profileData.status === 'suspended') {
+                        throw new Error("Your account is suspended. Please contact support.");
+                    }
+                    loginEmail = profileData.email;
+                }
             }
 
             if (!loginEmail) {
@@ -155,18 +183,37 @@ export default function PhoneLoginPage() {
                             isPasswordFocused && styles.phoneInputFocused
                         ]}>
                             <Text style={styles.inputLabel}>Password</Text>
-                            <TextInput
-                                style={styles.phoneInput}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                onFocus={() => setIsPasswordFocused(true)}
-                                onBlur={() => setIsPasswordFocused(false)}
-                                placeholderTextColor="#9ca3af"
-                                selectionColor="#10b981"
-                            />
+                            <View style={styles.passwordInputWrapper}>
+                                <TextInput
+                                    style={[styles.phoneInput, { flex: 1 }]}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    onFocus={() => setIsPasswordFocused(true)}
+                                    onBlur={() => setIsPasswordFocused(false)}
+                                    placeholderTextColor="#9ca3af"
+                                    selectionColor="#10b981"
+                                />
+                                <TouchableOpacity 
+                                    onPress={() => setShowPassword(!showPassword)}
+                                    style={styles.eyeIconContainer}
+                                >
+                                    <Ionicons 
+                                        name={showPassword ? "eye-off" : "eye"} 
+                                        size={20} 
+                                        color="#9ca3af" 
+                                    />
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.forgotPasswordButton}
+                        onPress={() => navigation.navigate('ForgotPassword' as never)}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                    </TouchableOpacity>
 
                     {/* Disclaimer */}
                     <Text style={styles.disclaimer}>
@@ -295,6 +342,26 @@ const styles = StyleSheet.create({
         paddingTop: 16, // Space for label
         paddingBottom: 4,
         height: '100%',
+    },
+    passwordInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    eyeIconContainer: {
+        padding: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    forgotPasswordButton: {
+        alignSelf: 'flex-end',
+        marginBottom: 16,
+    },
+    forgotPasswordText: {
+        color: '#10b981', // green matching the theme
+        fontSize: 14,
+        fontWeight: '600',
     },
     disclaimer: {
         color: '#9ca3af',
