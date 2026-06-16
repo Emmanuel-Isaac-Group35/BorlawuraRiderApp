@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
     profile: null,
     loading: true,
     signOut: async () => { },
+    refreshProfile: async () => { },
     registrationData: {
         email: '',
         phone: '',
@@ -179,17 +181,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Refresh session on app resume
     useEffect(() => {
-        const handleAppStateChange = (state: string) => {
-            if (state === 'active') {
-                supabase.auth.startAutoRefresh();
-            } else {
-                supabase.auth.stopAutoRefresh();
-            }
-        };
+        // FIX: Wire up AppState listener so Supabase token refresh is properly paused when app goes to background
+    const handleAppStateChange = (state: string) => {
+        if (state === 'active') {
+            supabase.auth.startAutoRefresh();
+        } else {
+            supabase.auth.stopAutoRefresh();
+        }
+    };
 
-        // There is no AppState listener in this snippet but it's good practice.
-        // For now, let's keep it simple.
-    }, []);
+    const appStateSub = AppState.addEventListener('change', handleAppStateChange);
+    return () => appStateSub.remove();
+  }, []);
 
     const fetchProfile = async (userId: string) => {
         try {

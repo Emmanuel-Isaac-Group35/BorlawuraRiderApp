@@ -8,9 +8,41 @@ import { NavigationContainer } from '@react-navigation/native';
 import i18n from './src/i18n';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { AppNavigator } from './src/navigation';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, ActivityIndicator, View } from 'react-native';
+import { 
+  useFonts,
+  Montserrat_100Thin,
+  Montserrat_200ExtraLight,
+  Montserrat_300Light,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+  Montserrat_800ExtraBold,
+  Montserrat_900Black 
+} from '@expo-google-fonts/montserrat';
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Montserrat_100Thin,
+    Montserrat_200ExtraLight,
+    Montserrat_300Light,
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
+    Montserrat_900Black,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e3325' }}>
+        <ActivityIndicator size="large" color="#10b981" />
+      </View>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
@@ -32,10 +64,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
-
-
-
-
-
-

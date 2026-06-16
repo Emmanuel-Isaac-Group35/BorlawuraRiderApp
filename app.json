@@ -32,7 +32,9 @@
         "ACCESS_FINE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "config": {
         "googleMaps": {
@@ -44,7 +46,10 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "openRouteServiceApiKey": ""
+      "openRouteServiceApiKey": "",
+      "eas": {
+        "projectId": "46d728db-4b65-4fe5-abef-28684c163ce3"
+      }
     },
     "plugins": [
       [
@@ -55,6 +60,7 @@
       ],
       "expo-asset",
       "expo-font"
-    ]
+    ],
+    "owner": "ikedelta"
   }
 }

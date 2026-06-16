@@ -21,8 +21,6 @@ export default function PersonalInfoPage() {
     const { updateRegistrationData } = useAuth();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
     const [languages, setLanguages] = useState<string[]>(['English']);
     const [showLangModal, setShowLangModal] = useState(false);
 
@@ -36,31 +34,19 @@ export default function PersonalInfoPage() {
         }
     };
 
-
     const handleBack = () => {
         navigation.goBack();
     };
 
     const handleNext = () => {
-        if (!firstName || !lastName || !password) {
+        if (!firstName || !lastName) {
             Alert.alert("Missing Information", "Please fill in all required fields.");
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            Alert.alert("Password Mismatch", "Passwords do not match.");
-            return;
-        }
-
-        if (password.length < 6) {
-            Alert.alert("Weak Password", "Password must be at least 6 characters.");
             return;
         }
 
         updateRegistrationData({
             first_name: firstName.trim(),
             last_name: lastName.trim(),
-            password: password.trim(),
             language: languages.join(', ') // Save as comma separated string for now as per schema
         });
         navigation.navigate('DriverLicense' as never);
@@ -114,11 +100,11 @@ export default function PersonalInfoPage() {
                             <Text style={styles.requiredStar}>*</Text>
                         </View>
                         <TextInput
-                            style={[styles.input, styles.inputError]} // Simulating error state from image
+                            style={styles.input}
                             value={firstName}
                             onChangeText={setFirstName}
+                            placeholder="e.g. John"
                         />
-                        <Text style={styles.errorText}>This field is required</Text>
                     </View>
 
                     {/* Last Name */}
@@ -128,42 +114,10 @@ export default function PersonalInfoPage() {
                             <Text style={styles.requiredStar}>*</Text>
                         </View>
                         <TextInput
-                            style={[styles.input, styles.inputError]}
+                            style={styles.input}
                             value={lastName}
                             onChangeText={setLastName}
-                        />
-                        <Text style={styles.errorText}>This field is required</Text>
-                    </View>
-
-                    {/* Password */}
-                    <View style={styles.inputGroup}>
-                        <View style={styles.labelRow}>
-                            <Text style={styles.label}>Password</Text>
-                            <Text style={styles.requiredStar}>*</Text>
-                        </View>
-                        <TextInput
-                            style={styles.input}
-                            value={password}
-                            onChangeText={setPassword}
-                            placeholder="Min. 6 characters"
-                            placeholderTextColor="#9ca3af"
-                            secureTextEntry
-                        />
-                    </View>
-
-                    {/* Confirm Password */}
-                    <View style={styles.inputGroup}>
-                        <View style={styles.labelRow}>
-                            <Text style={styles.label}>Confirm Password</Text>
-                            <Text style={styles.requiredStar}>*</Text>
-                        </View>
-                        <TextInput
-                            style={styles.input}
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            placeholder="Re-enter password"
-                            placeholderTextColor="#9ca3af"
-                            secureTextEntry
+                            placeholder="e.g. Doe"
                         />
                     </View>
 
@@ -192,15 +146,9 @@ export default function PersonalInfoPage() {
                         </TouchableOpacity>
                     </View>
 
-
-
-
-
-
                     <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
                         <Ionicons name="arrow-forward" size={24} color="#fff" />
                     </TouchableOpacity>
-
                 </ScrollView>
             </KeyboardAvoidingView>
 

@@ -193,6 +193,16 @@ export default function PhoneLoginPage() {
                             </Text>
                         )}
                     </TouchableOpacity>
+
+                    {/* Sign Up Link */}
+                    <TouchableOpacity 
+                        style={styles.signUpLink} 
+                        onPress={() => navigation.navigate('Register' as never)}
+                    >
+                        <Text style={styles.signUpText}>
+                            Don't have an account? <Text style={styles.signUpHighlight}>Sign Up</Text>
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </TouchableWithoutFeedback>
         </SafeAreaView>
@@ -313,5 +323,17 @@ const styles = StyleSheet.create({
     },
     continueButtonTextActive: {
         color: '#ffffff',
+    },
+    signUpLink: {
+        marginTop: 20,
+        alignItems: 'center',
+    },
+    signUpText: {
+        color: '#9ca3af',
+        fontSize: 14,
+    },
+    signUpHighlight: {
+        color: '#10b981',
+        fontWeight: 'bold',
     },
 });

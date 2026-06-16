@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 // Pages
 import HomePage from '../pages/home';
 import TripsPage from '../pages/trips';
+import TripDetailPage from '../pages/trips/TripDetailPage';
 import TrackingPage from '../pages/tracking';
 import ProfilePage from '../pages/profile';
 import RequestPage from '../pages/request';
@@ -14,6 +15,7 @@ import ActiveTripPage from '../pages/active-trip';
 import TripCompletePage from '../pages/trip-complete';
 import SupportPage from '../pages/support';
 import NotFound from '../pages/NotFound';
+import SettingsPage from '../pages/profile/SettingsPage';
 import AuthPage from '../pages/auth';
 import AuditLogsPage from '../pages/audit-logs';
 import { useAuth } from '../contexts/AuthContext';
@@ -89,7 +91,6 @@ function MainTabs() {
 
 export function AppNavigator() {
   const { session, loading } = useAuth();
-  const Stack = createNativeStackNavigator();
 
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
@@ -129,7 +130,11 @@ export function AppNavigator() {
           <Stack.Screen name="ActiveTrip" component={ActiveTripPage} />
           <Stack.Screen name="Tracking" component={TrackingPage} />
           <Stack.Screen name="TripComplete" component={TripCompletePage} />
+          <Stack.Screen name="Trips" component={TripsPage} />
+          <Stack.Screen name="TripDetail" component={TripDetailPage} />
+          <Stack.Screen name="Profile" component={ProfilePage} />
           <Stack.Screen name="Support" component={SupportPage} />
+          <Stack.Screen name="Settings" component={SettingsPage} />
           <Stack.Screen name="AuditLogs" component={AuditLogsPage} />
           <Stack.Screen name="NotFound" component={NotFound} />
         </>

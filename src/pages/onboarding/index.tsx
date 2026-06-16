@@ -1,205 +1,104 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Dimensions, StatusBar } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { colors } from '../../utils/colors'; // Assuming colors are defined here
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Dimensions,
+  Image,
+  StatusBar,
+  Animated,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+
+const SLIDES = [
+  { id: '1', title: 'ELITE LOGISTICS', description: 'Join the most professional waste management network in West Africa.', image: 'https://readdy.ai/api/search-image?query=professional%20truck&width=500&height=500', icon: 'shield-checkmark' },
+  { id: '2', title: 'SURGICAL PRECISION', description: 'Real-time GPS tracking and intelligent mission routing at your fingertips.', image: 'https://readdy.ai/api/search-image?query=digital%20map&width=500&height=500', icon: 'navigate' },
+  { id: '3', title: 'COMMAND CONTROL', description: 'Manage your jobs, fleet awareness, and earnings in one elite terminal.', image: 'https://readdy.ai/api/search-image?query=dashboard%20interface&width=500&height=500', icon: 'terminal' }
+];
 
 export default function OnboardingPage() {
-    const navigation = useNavigation();
-    const [showLoginOptions, setShowLoginOptions] = useState(false);
+  const navigation = useNavigation<any>();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const slidesRef = useRef<FlatList>(null);
 
-    const handleSignIn = () => {
-        setShowLoginOptions(true);
-    };
+  const viewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index);
+  }).current;
 
-    const handleEmailLogin = () => {
-        setShowLoginOptions(false);
-        navigation.navigate('Auth', { isLogin: true });
-    };
+  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
-    const handlePhoneLogin = () => {
-        setShowLoginOptions(false);
-        navigation.navigate('PhoneLogin' as never);
-    };
+  const scrollToNext = () => {
+    if (currentIndex < SLIDES.length - 1) {
+      slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
+    } else {
+      navigation.replace('Register');
+    }
+  };
 
-    const handleRegister = () => {
-        navigation.navigate('Register' as never);
-    };
+  const renderSlide = ({ item }: { item: any }) => (
+    <View style={styles.slide}>
+       <Image source={{ uri: item.image }} style={styles.slideImage} />
+       <LinearGradient colors={['transparent', 'rgba(14, 51, 37, 0.8)', '#0e3325']} style={styles.gradient} />
+       <View style={styles.textContainer}>
+          <View style={styles.iconBox}><Ionicons name={item.icon} size={30} color="#10b981" /></View>
+          <Text style={styles.slideTitle}>{item.title}</Text>
+          <Text style={styles.slideDesc}>{item.description}</Text>
+       </View>
+    </View>
+  );
 
-    return (
-        <View style={styles.container}>
-            <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-            <ImageBackground
-                source={require('../../../assets/tricycle_onboarding.png')}
-                style={styles.backgroundImage}
-                resizeMode="cover"
-            >
-                <View style={styles.overlay} />
-
-                <View style={styles.contentContainer}>
-                    <View style={styles.bottomSheet}>
-                        {showLoginOptions ? (
-                            <>
-                                <View style={styles.headerRow}>
-                                    {/* Empty View to balance flex if needed, or absolute positioning for close button */}
-                                    <View style={{ flex: 1 }} />
-                                    <TouchableOpacity
-                                        onPress={() => setShowLoginOptions(false)}
-                                        style={styles.closeButton}
-                                    >
-                                        <Ionicons name="close" size={24} color="#ffffff" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                <Text style={styles.title}>Welcome back</Text>
-                                <Text style={styles.subtitle2}>Sign in with one of the options below</Text>
-
-                                <View style={styles.buttonContainer}>
-                                    <TouchableOpacity style={styles.signInButton} onPress={handlePhoneLogin}>
-                                        <Text style={styles.signInButtonText}>Continue with phone number</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity style={styles.registerButton} onPress={handleEmailLogin}>
-                                        <Text style={styles.registerButtonText}>Continue with email/username</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </>
-                        ) : (
-                            <>
-                                <View style={styles.logoContainer}>
-                                    <Text style={styles.logoTextGreen}>Borla Wura </Text>
-                                    <Text style={styles.logoTextWhite}>Rider</Text>
-                                </View>
-
-                                <Text style={styles.subtitle}>
-                                    Drive with Borla Wura.
-                                </Text>
-                                <Text style={styles.subtitle2}>
-                                    Earn extra money driving.
-                                </Text>
-
-                                <View style={styles.buttonContainer}>
-                                    <TouchableOpacity style={styles.signInButton} onPress={handleSignIn}>
-                                        <Text style={styles.signInButtonText}>Sign in</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-                                        <Text style={styles.registerButtonText}>Register</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </>
-                        )}
-                    </View>
-                </View>
-            </ImageBackground>
-        </View>
-    );
+  return (
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <FlatList
+        data={SLIDES}
+        renderItem={renderSlide}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        pagingEnabled
+        bounces={false}
+        keyExtractor={(item) => item.id}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+        onViewableItemsChanged={viewableItemsChanged}
+        viewabilityConfig={viewConfig}
+        ref={slidesRef}
+      />
+      <View style={styles.footer}>
+         <View style={styles.indicatorContainer}>
+            {SLIDES.map((_, i) => {
+              const dotWidth = scrollX.interpolate({ inputRange: [(i - 1) * width, i * width, (i + 1) * width], outputRange: [8, 24, 8], extrapolate: 'clamp' });
+              return <Animated.View key={i} style={[styles.dot, { width: dotWidth }]} />;
+            })}
+         </View>
+         <TouchableOpacity style={styles.nextBtn} onPress={scrollToNext}>
+            <Text style={styles.nextText}>{currentIndex === SLIDES.length - 1 ? 'GET STARTED' : 'CONTINUE'}</Text>
+            <Ionicons name="arrow-forward" size={24} color="#0e3325" />
+         </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    backgroundImage: {
-        flex: 1,
-        width: width,
-        height: height,
-    },
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.1)', // Slight overlay for image pop
-    },
-    contentContainer: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-    bottomSheet: {
-        backgroundColor: '#1f2937', // Dark gray/blue similar to image
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 24,
-        paddingBottom: 40,
-        alignItems: 'center',
-        width: '100%',
-    },
-    logoContainer: {
-        flexDirection: 'row',
-        marginBottom: 16,
-        marginTop: 8,
-    },
-    logoTextGreen: {
-        color: '#34d399', // Bright green
-        fontSize: 32,
-        fontWeight: 'bold',
-    },
-    logoTextWhite: {
-        color: '#ffffff',
-        fontSize: 32,
-        fontWeight: 'bold',
-    },
-    subtitle: {
-        color: '#ffffff',
-        fontSize: 18,
-        textAlign: 'center',
-        marginBottom: 4,
-    },
-    subtitle2: {
-        color: '#d1d5db', // Light gray
-        fontSize: 16,
-        textAlign: 'center',
-        marginBottom: 32,
-    },
-    buttonContainer: {
-        width: '100%',
-        gap: 16,
-    },
-    signInButton: {
-        backgroundColor: '#10b981', // Key Green
-        paddingVertical: 16,
-        borderRadius: 30, // Pill shape
-        alignItems: 'center',
-        width: '100%',
-    },
-    signInButtonText: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    registerButton: {
-        backgroundColor: 'rgba(255,255,255,0.15)', // Transparent/Glassy for Register or Outline
-        paddingVertical: 16,
-        borderRadius: 30,
-        alignItems: 'center',
-        width: '100%',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)', // Slight border for outline feel
-    },
-    registerButtonText: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    // New styles for Welcome Back state
-    headerRow: {
-        width: '100%',
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        marginBottom: 0,
-    },
-    closeButton: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 20,
-        padding: 4,
-        marginBottom: 8,
-    },
-    title: {
-        color: '#ffffff',
-        fontSize: 28,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
+  container: { flex: 1, backgroundColor: '#0e3325' },
+  slide: { width, height: '100%' },
+  slideImage: { width: '100%', height: '70%', resizeMode: 'cover' },
+  gradient: { position: 'absolute', bottom: 0, width: '100%', height: '60%' },
+  textContainer: { position: 'absolute', bottom: 180, width: '100%', paddingHorizontal: 30 },
+  iconBox: { width: 64, height: 64, borderRadius: 24, backgroundColor: 'rgba(16, 185, 129, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  slideTitle: { fontSize: 32, fontFamily: 'Montserrat_900Black', color: '#fff', letterSpacing: 2 },
+  slideDesc: { fontSize: 16, fontFamily: 'Montserrat_700Bold', color: '#10b981', marginTop: 15, lineHeight: 24 },
+  footer: { position: 'absolute', bottom: 60, width: '100%', paddingHorizontal: 30, alignItems: 'center' },
+  indicatorContainer: { flexDirection: 'row', height: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
+  dot: { height: 8, borderRadius: 4, backgroundColor: '#10b981', marginHorizontal: 4 },
+  nextBtn: { height: 74, width: '100%', backgroundColor: '#fff', borderRadius: 24, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 15, elevation: 20 },
+  nextText: { fontSize: 18, fontFamily: 'Montserrat_900Black', color: '#0e3325', letterSpacing: 1 }
 });
