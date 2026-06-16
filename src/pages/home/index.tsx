@@ -248,21 +248,101 @@ export default function HomePage() {
     };
   }, []);
 
-  // Listen for realtime orders
+  // Listen for realtime orders with a robust fallback
   useEffect(() => {
     if (!user || !isOnline) return;
 
-    // Secondary Security check: Ensure documents are still present
-    const isVerified = !!profile?.license_photo_url && 
-                       !!profile?.ghana_card_photo_url && 
-                       !!profile?.vehicle_photo_url;
-    
-    if (!isVerified) {
-       // If somehow online but not verified, force offline
-       updateOnlineStatus(false);
-       return;
-    }
+    const seenOrders = new Set<string>();
 
+    const handleNewOrder = async (order: any) => {
+      if (seenOrders.has(order.id)) return;
+      seenOrders.add(order.id);
+
+      const isRequestedForOtherRider = order.rider_id && order.rider_id !== user.id;
+
+      if (order.status === 'pending' && isOnline && !isRequestedForOtherRider) {
+        const enrichedTrip = { ...order };
+        const tripId = order.user_id || order.userId || order.customer_id;
+        
+        const existingName = order.customer_name || order.customerName || 
+                         order.user_name || order.userName || 
+                         order.full_name || order.fullName ||
+                         order.client_name || order.clientName ||
+                         (order.first_name ? (`${order.first_name} ${order.last_name || ''}`).trim() : null);
+
+        if (tripId && (!existingName || existingName === 'Customer')) {
+          try {
+            let { data: profile_data, error: profile_error } = await supabase
+              .from('profiles')
+              .select('full_name, first_name, last_name, email')
+              .eq('id', tripId)
+              .maybeSingle();
+            
+            if (!profile_data || profile_error?.code === '42P01') {
+               const { data: riderProfile } = await supabase
+                .from('riders')
+                .select('first_name, last_name, email')
+                .eq('id', tripId)
+                .maybeSingle();
+               if (riderProfile) profile_data = { ...riderProfile, full_name: null } as any;
+            }
+
+            if (profile_data) {
+              const resolvedName = (profile_data as any).full_name || 
+                                          ((profile_data as any).first_name ? (`${(profile_data as any).first_name} ${(profile_data as any).last_name || ''}`).trim() : 
+                                          ((profile_data as any).email?.split('@')[0] || 'Customer'));
+              enrichedTrip.customer_name = resolvedName;
+
+              await supabase
+                .from('orders')
+                .update({ customer_name: resolvedName })
+                .eq('id', order.id);
+            }
+          } catch (err) {
+            console.error('Error fetching/updating customer profile:', err);
+          }
+        } else if (existingName && existingName !== 'Customer') {
+           enrichedTrip.customer_name = existingName;
+        }
+
+        // Auto-Accept Logic
+        if (settings.autoAccept) {
+           try {
+             const { data, error } = await supabase
+               .from('orders')
+               .update({ 
+                 rider_id: user.id, 
+                 status: 'accepted',
+                 accepted_at: new Date().toISOString() 
+               })
+               .eq('id', order.id)
+               .is('rider_id', null)
+               .select();
+             
+             if (error) throw error;
+
+             if (data && data.length > 0) {
+               navigation.navigate('ActiveTrip' as never, { trip: enrichedTrip } as never);
+               return;
+             } else {
+               console.log('Auto-accept skipped: order already taken.');
+               return;
+             }
+           } catch (e) {
+             console.error('Auto-accept failed:', e);
+           }
+        }
+
+        if (settings.pushNotifications) {
+          setShowNotification(true);
+          setTimeout(() => {
+            navigation.navigate('Request', { trip: enrichedTrip });
+          }, 1000);
+        }
+      }
+    };
+
+    // Primary Subscription: Realtime WebSocket (Fastest if enabled on server)
     const tripsSubscription = supabase
       .channel('new-trip-requests')
       .on(
@@ -273,94 +353,34 @@ export default function HomePage() {
           table: 'orders',
         },
         async (payload: any) => {
-          const isRequestedForOtherRider = payload.new.rider_id && payload.new.rider_id !== user.id;
-
-          if (payload.new.status === 'pending' && isOnline && !isRequestedForOtherRider) {
-            const enrichedTrip = { ...payload.new };
-            const tripId = payload.new.user_id || payload.new.userId || payload.new.customer_id;
-            
-            const existingName = payload.new.customer_name || payload.new.customerName || 
-                             payload.new.user_name || payload.new.userName || 
-                             payload.new.full_name || payload.new.fullName ||
-                             payload.new.client_name || payload.new.clientName ||
-                             (payload.new.first_name ? (`${payload.new.first_name} ${payload.new.last_name || ''}`).trim() : null);
-
-            if (tripId && (!existingName || existingName === 'Customer')) {
-              try {
-                let { data: profile_data, error: profile_error } = await supabase
-                  .from('profiles')
-                  .select('full_name, first_name, last_name, email')
-                  .eq('id', tripId)
-                  .maybeSingle();
-                
-                if (!profile_data || profile_error?.code === '42P01') {
-                   const { data: riderProfile } = await supabase
-                    .from('riders')
-                    .select('first_name, last_name, email')
-                    .eq('id', tripId)
-                    .maybeSingle();
-                   if (riderProfile) profile_data = { ...riderProfile, full_name: null } as any;
-                }
-
-                if (profile_data) {
-                  const resolvedName = (profile_data as any).full_name || 
-                                              ((profile_data as any).first_name ? (`${(profile_data as any).first_name} ${(profile_data as any).last_name || ''}`).trim() : 
-                                              ((profile_data as any).email?.split('@')[0] || 'Customer'));
-                  enrichedTrip.customer_name = resolvedName;
-
-                  await supabase
-                    .from('orders')
-                    .update({ customer_name: resolvedName })
-                    .eq('id', payload.new.id);
-                }
-              } catch (err) {
-                console.error('Error fetching/updating customer profile:', err);
-              }
-            } else if (existingName && existingName !== 'Customer') {
-               enrichedTrip.customer_name = existingName;
-            }
-
-            // Auto-Accept Logic
-            if (settings.autoAccept) {
-               try {
-                 const { data, error } = await supabase
-                   .from('orders')
-                   .update({ 
-                     rider_id: user.id, 
-                     status: 'accepted',
-                     accepted_at: new Date().toISOString() 
-                   })
-                   .eq('id', payload.new.id)
-                   .is('rider_id', null)
-                   .select();
-                 
-                 if (error) throw error;
-
-                 if (data && data.length > 0) {
-                   navigation.navigate('ActiveTrip' as never, { trip: enrichedTrip } as never);
-                   return;
-                 } else {
-                   console.log('Auto-accept skipped: order already taken.');
-                   return;
-                 }
-               } catch (e) {
-                 console.error('Auto-accept failed:', e);
-               }
-            }
-
-            if (settings.pushNotifications) {
-              setShowNotification(true);
-              setTimeout(() => {
-                navigation.navigate('Request', { trip: enrichedTrip });
-              }, 1000);
-            }
-          }
+          handleNewOrder(payload.new);
         }
       )
       .subscribe();
 
+    // Fallback Polling: Ensures we never miss an order even if Realtime is disabled on the server
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (!error && data) {
+          for (const order of data) {
+            handleNewOrder(order);
+          }
+        }
+      } catch (err) {
+        console.log('Polling error:', err);
+      }
+    }, 5000);
+
     return () => {
       supabase.removeChannel(tripsSubscription);
+      clearInterval(pollInterval);
     };
   }, [user, isOnline]);
 

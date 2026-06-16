@@ -263,6 +263,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Only listen if the user is online
         if (!user || !profile?.is_online) return;
 
+        const seenGlobalOrders = new Set<string>();
+
+        const handleGlobalOrder = async (order: any) => {
+            if (seenGlobalOrders.has(order.id)) return;
+            seenGlobalOrders.add(order.id);
+
+            console.log('Global listener: New pending order received!', order);
+            
+            // Only send push notification if the app is minimized (in the background or inactive)
+            if (settings.pushNotifications && appState.current !== 'active') {
+                try {
+                    await Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: "New Pickup Request! 🚨",
+                            body: "A new waste pickup request is available near you. Tap to open Borlawura.",
+                            data: { orderId: order.id },
+                            sound: settings.soundAlerts ? 'default' : null,
+                        },
+                        trigger: null, // trigger immediately
+                    });
+                } catch (e) {
+                    console.error('Error triggering local notification:', e);
+                }
+            } else if (appState.current === 'active') {
+                // In-App Alert for active foreground state
+                Alert.alert(
+                    "New Pickup Request! 🚨",
+                    "A new waste pickup request is available near you.",
+                    [
+                        { text: "Ignore", style: "cancel" },
+                        { 
+                            text: "View Request", 
+                            onPress: () => {
+                                supabase.from('orders').select('*').eq('id', order.id).maybeSingle().then(({data: tripData}) => {
+                                   if (tripData) {
+                                      navigate('Request', { trip: tripData });
+                                   }
+                                });
+                            }
+                        }
+                    ]
+                );
+            }
+        };
+
         const ordersSubscription = supabase
             .channel('global-orders-listener')
             .on(
@@ -274,46 +319,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     filter: 'status=eq.pending',
                 },
                 async (payload) => {
-                    console.log('Global listener: New pending order received!', payload.new);
-                    
-                    // Only send push notification if the app is minimized (in the background or inactive)
-                    if (settings.pushNotifications && appState.current !== 'active') {
-                        try {
-                            await Notifications.scheduleNotificationAsync({
-                                content: {
-                                    title: "New Pickup Request! 🚨",
-                                    body: "A new waste pickup request is available near you. Tap to open Borlawura.",
-                                    data: { orderId: payload.new.id },
-                                    sound: settings.soundAlerts ? 'default' : null,
-                                },
-                                trigger: null, // trigger immediately
-                            });
-                        } catch (e) {
-                            console.error('Error triggering local notification:', e);
-                        }
-                    } else if (appState.current === 'active') {
-                        // In-App Alert for active foreground state
-                        Alert.alert(
-                            "New Pickup Request! 🚨",
-                            "A new waste pickup request is available near you.",
-                            [
-                                { text: "Ignore", style: "cancel" },
-                                { 
-                                    text: "View Request", 
-                                    onPress: () => {
-                                        supabase.from('orders').select('*').eq('id', payload.new.id).maybeSingle().then(({data: tripData}) => {
-                                           if (tripData) {
-                                              navigate('Request', { trip: tripData });
-                                           }
-                                        });
-                                    }
-                                }
-                            ]
-                        );
-                    }
+                    handleGlobalOrder(payload.new);
                 }
             )
             .subscribe();
+
+        // Fallback polling for background push notifications if Realtime is off
+        const globalPollInterval = setInterval(async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+                
+                if (data && !error) {
+                    for (const order of data) {
+                        handleGlobalOrder(order);
+                    }
+                }
+            } catch (e) {}
+        }, 8000);
 
         // Listen for notification TAPS (Deep Linking)
         const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
@@ -330,6 +357,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         return () => {
             supabase.removeChannel(ordersSubscription);
+            clearInterval(globalPollInterval);
             if (responseListener) {
                responseListener.remove();
             }
