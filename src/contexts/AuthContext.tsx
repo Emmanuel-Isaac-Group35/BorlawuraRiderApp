@@ -172,13 +172,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         // Helper to ensure Rider starts offline
-        const forceOfflineAndFetch = async (userId: string) => {
-            try {
-                // Explicitly set offline in the database on app open / login
-                await supabase.from('riders').update({ is_online: false }).eq('id', userId);
-            } catch (e) {
-                console.error('Failed to force offline on startup:', e);
-            }
+        const forceOfflineAndFetch = (userId: string) => {
+            // Explicitly set offline in the database on app open / login without blocking
+            (async () => {
+                try {
+                    await supabase.from('riders').update({ is_online: false }).eq('id', userId);
+                } catch (e) {
+                    console.error('Failed to force offline on startup:', e);
+                }
+            })();
+            
             fetchProfile(userId);
         };
 
@@ -237,10 +240,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 (payload) => {
                     console.log('Real-time rider profile update:', payload.new);
                     const newProfile = payload.new as Profile;
-                    if (newProfile.status === 'suspended') {
+                    if (newProfile.status === 'suspended' || newProfile.status === 'pending' || newProfile.status === 'rejected') {
+                        let msg = 'Your account has been suspended by an administrator.';
+                        let title = 'Account Suspended';
+                        if (newProfile.status === 'pending') {
+                            title = 'Account Pending';
+                            msg = 'Your account is pending approval by an administrator.';
+                        }
+                        if (newProfile.status === 'rejected') {
+                            title = 'Account Rejected';
+                            msg = 'Your application has been rejected. Please contact support.';
+                        }
+                        
                         Alert.alert(
-                            'Account Suspended', 
-                            'Your account has been suspended by an administrator. Please contact support.',
+                            title, 
+                            msg,
                             [
                                 { text: 'OK', onPress: () => supabase.auth.signOut() }
                             ],
@@ -468,10 +482,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (error) {
                 console.error('Error fetching profile:', error);
             } else {
-                if (data?.status === 'suspended') {
+                if (data?.status === 'suspended' || data?.status === 'pending' || data?.status === 'rejected') {
+                    let msg = 'Your account has been suspended by an administrator.';
+                    let title = 'Account Suspended';
+                    if (data?.status === 'pending') {
+                        title = 'Account Pending';
+                        msg = 'Your account is pending approval by an administrator.';
+                    }
+                    if (data?.status === 'rejected') {
+                        title = 'Account Rejected';
+                        msg = 'Your application has been rejected. Please contact support.';
+                    }
+                    
                     Alert.alert(
-                        'Account Suspended', 
-                        'Your account has been suspended by an administrator. Please contact support.',
+                        title, 
+                        msg,
                         [
                             { text: 'OK', onPress: () => supabase.auth.signOut() }
                         ],

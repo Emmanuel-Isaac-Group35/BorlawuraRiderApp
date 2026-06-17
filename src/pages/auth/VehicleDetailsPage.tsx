@@ -109,6 +109,7 @@ export default function VehicleDetailsPage() {
             // 2. Upsert Profile
             const finalProfile = {
                 id: userId,
+                status: 'pending',
                 email: trimmedEmail,
                 phone: registrationData.phone,
                 phone_number: registrationData.phone,
@@ -132,6 +133,9 @@ export default function VehicleDetailsPage() {
                 console.log("Profile upsert error:", JSON.stringify(profileError, null, 2));
                 throw profileError;
             }
+
+            // Ensure the newly created rider is signed out so they cannot access the app until approved
+            await supabase.auth.signOut();
 
             Alert.alert(
                 "Application Submitted",

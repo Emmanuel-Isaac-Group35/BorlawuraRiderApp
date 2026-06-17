@@ -15,7 +15,7 @@ export type Profile = {
     rating: number;
     total_trips: number;
     is_online: boolean;
-    status?: 'active' | 'suspended';
+    status?: 'pending' | 'active' | 'suspended' | 'rejected';
 
     created_at: string;
     updated_at: string;

@@ -10,6 +10,8 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -94,7 +96,8 @@ export default function SupportPage() {
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('audit_logs').insert({
-        user_id: user.id,
+        target_id: user.id,
+        target_type: 'riders',
         action: 'support_ticket',
         details: {
           name: formData.name,
@@ -109,10 +112,12 @@ export default function SupportPage() {
         setFormData({ name: '', phone: '', issue: 'trip', description: '' });
         setTimeout(() => setShowSuccess(false), 3000);
       } else {
-        Alert.alert('Error', 'Failed to submit. Please try again.');
+        console.error('Supabase Support Error:', error);
+        Alert.alert('Error', `Failed to submit: ${error?.message || 'Please try again.'}`);
       }
-    } catch (error) {
-      Alert.alert('Error', 'An error occurred. Please check your connection and try again.');
+    } catch (error: any) {
+      console.error('Supabase Catch Error:', error);
+      Alert.alert('Error', `An error occurred: ${error?.message || 'Please try again.'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -126,6 +131,10 @@ export default function SupportPage() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F3F4F6" />
       
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       {/* Premium Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
@@ -260,6 +269,7 @@ export default function SupportPage() {
         )}
 
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Category Selection Modal */}
       <Modal visible={showCategoryModal} onClose={() => setShowCategoryModal(false)}>

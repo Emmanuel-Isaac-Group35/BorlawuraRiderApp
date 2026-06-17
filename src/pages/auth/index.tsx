@@ -81,6 +81,14 @@ export default function AuthPage({ route }: any) {
                     await supabase.auth.signOut();
                     throw new Error("Your account is suspended. Please contact support.");
                 }
+                if (profile?.status === 'pending') {
+                    await supabase.auth.signOut();
+                    throw new Error("Your account is pending approval by an administrator.");
+                }
+                if (profile?.status === 'rejected') {
+                    await supabase.auth.signOut();
+                    throw new Error("Your application has been rejected. Please contact support.");
+                }
             }
         } catch (error: any) {
             Alert.alert('Error', error.message);
