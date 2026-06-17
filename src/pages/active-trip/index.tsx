@@ -72,6 +72,7 @@ type RootStackParamList = {
   ActiveTrip: { trip?: any };
   Tracking: { trip?: any };
   TripComplete: { trip?: any };
+  Chat: { trip?: any };
 };
 
 type ActiveTripRouteProp = RouteProp<RootStackParamList, 'ActiveTrip'>;
@@ -247,7 +248,22 @@ export default function ActiveTripPage() {
           timeInterval: 10000,
           distanceInterval: 25,
         },
-        (newLoc) => setCurrentLocation(newLoc)
+        async (newLoc) => {
+          setCurrentLocation(newLoc);
+          if (dbTrip?.id) {
+            const { error } = await supabase
+              .from('orders')
+              .update({
+                rider_lat: newLoc.coords.latitude,
+                rider_lng: newLoc.coords.longitude,
+                rider_heading: newLoc.coords.heading ?? 0,
+              })
+              .eq('id', dbTrip.id);
+            if (error) {
+              console.error('Failed to update rider location in Supabase:', error);
+            }
+          }
+        }
       );
     };
     startTracking();
@@ -364,7 +380,7 @@ export default function ActiveTripPage() {
         showsCompass={false}
         toolbarEnabled={false}
       >
-        {/* Rider marker (Top-down car) */}
+        {/* Rider marker (Motorbike placeholder) */}
         <Marker 
           ref={markerRef}
           coordinate={{ latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude }} 
@@ -372,11 +388,22 @@ export default function ActiveTripPage() {
           zIndex={10}
           rotation={currentLocation.coords.heading || 0}
         >
-          <View style={styles.carMarkerContainer}>
-            <View style={styles.carWindshield} />
-            <View style={styles.carRoof} />
-            <View style={styles.carRearWindow} />
-          </View>
+          {/* TODO: replace with motorbike asset */}
+          <View style={{
+            width: 24,
+            height: 40,
+            backgroundColor: '#10b981',
+            borderRadius: 12,
+            borderWidth: 2,
+            borderColor: '#fff',
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 3,
+            elevation: 5,
+          }} />
         </Marker>
 
         {/* Destination marker */}
@@ -486,7 +513,7 @@ export default function ActiveTripPage() {
               </View>
 
               <View style={styles.uberActionRow}>
-                <TouchableOpacity style={styles.uberChatBtn} onPress={() => navigation.navigate('Chat' as never, { trip: dbTrip || trip } as never)}>
+                <TouchableOpacity style={styles.uberChatBtn} onPress={() => navigation.navigate('Chat', { trip: dbTrip })}>
                   <Ionicons name="chatbubble" size={24} color="#000" />
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.uberChatBtn, { marginLeft: 8 }]} onPress={handleCall}>

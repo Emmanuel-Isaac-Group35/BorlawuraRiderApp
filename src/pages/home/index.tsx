@@ -46,6 +46,7 @@ export default function HomePage() {
     acceptanceRate: 100,
   });
   const [isOnline, setIsOnline] = useState(false);
+  const onlineSinceRef = useRef<string | null>(null);
   const [showNotification, setShowNotification] = useState(false);
   
   const mapRef = useRef<MapView>(null);
@@ -185,6 +186,11 @@ export default function HomePage() {
       setStats(prev => ({ ...prev, rating: Number(profile.rating) }));
       if (profile.is_online !== undefined) {
         setIsOnline(profile.is_online);
+        if (profile.is_online && !onlineSinceRef.current) {
+          onlineSinceRef.current = new Date().toISOString();
+        } else if (!profile.is_online) {
+          onlineSinceRef.current = null;
+        }
       }
     }
   }, [profile]);
@@ -361,10 +367,14 @@ export default function HomePage() {
     // Fallback Polling: Ensures we never miss an order even if Realtime is disabled on the server
     const pollInterval = setInterval(async () => {
       try {
+        // Only fetch orders created after the rider went online
+        if (!onlineSinceRef.current) return;
+        
         const { data, error } = await supabase
           .from('orders')
           .select('*')
           .eq('status', 'pending')
+          .gte('created_at', onlineSinceRef.current)
           .order('created_at', { ascending: false })
           .limit(3);
 
@@ -432,10 +442,13 @@ export default function HomePage() {
     // Always update visual local state safely
     setIsOnline(status);
     if (status) {
+      onlineSinceRef.current = new Date().toISOString();
       setShowNotification(true);
       setTimeout(() => {
         setShowNotification(false);
       }, 1500);
+    } else {
+      onlineSinceRef.current = null;
     }
     
     try {

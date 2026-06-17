@@ -46,6 +46,7 @@ export default function RequestPage() {
   const [tripDistance, setTripDistance] = useState(0);
   const [tripCoords, setTripCoords] = useState({ lat: 5.6037, lng: -0.1870 });
   const [fullTripData, setFullTripData] = useState(trip);
+  const [riderLocation, setRiderLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const hasDeclinedRef = useRef(false);
 
@@ -144,6 +145,10 @@ export default function RequestPage() {
               }
               
               if (riderLoc) {
+                setRiderLocation({
+                  latitude: riderLoc.coords.latitude,
+                  longitude: riderLoc.coords.longitude,
+                });
                 const dist = calculateHaversine(
                   riderLoc.coords.latitude, riderLoc.coords.longitude,
                   lat, lng
@@ -305,11 +310,15 @@ export default function RequestPage() {
       hasDeclinedRef.current = true;
       if (user?.id && penalize) {
          // Silently log decline for accurate acceptance rate calculation
-         supabase.from('audit_logs').insert({
-             user_id: user.id,
-             action: 'request_declined',
-             details: { trip_id: trip?.id }
-         }).then(() => {}).catch(() => {});
+         try {
+           await supabase.from('audit_logs').insert({
+               user_id: user.id,
+               action: 'request_declined',
+               details: { trip_id: trip?.id }
+           });
+         } catch {
+           // Fire-and-forget: don't block navigation on logging failure
+         }
       }
     }
     navigation.goBack();
@@ -440,8 +449,8 @@ export default function RequestPage() {
               initialRegion={{
                 latitude: request.coordinates.lat,
                 longitude: request.coordinates.lng,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
               }}
               provider={PROVIDER_GOOGLE}
               scrollEnabled={false}
@@ -457,6 +466,27 @@ export default function RequestPage() {
                   longitude: request.coordinates.lng,
                 }}
               />
+              {riderLocation && (
+                <Marker
+                  coordinate={riderLocation}
+                  title="You"
+                >
+                  {/* TODO: Add motorbike-icon.png to assets/ */}
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: '#10b981',
+                    borderWidth: 3,
+                    borderColor: '#ffffff',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 3,
+                    elevation: 5,
+                  }} />
+                </Marker>
+              )}
             </MapView>
               {/* removed navigate external link button */}
           </View>

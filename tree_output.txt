@@ -1,0 +1,97 @@
+C:\final year project\BorlawuraRiderApp
+├── app.json
+├── App.tsx
+├── assets
+|  ├── adaptive-icon.png
+|  ├── favicon.png
+|  ├── icon.png
+|  ├── onboarding_bg.png
+|  ├── rider-icon.png
+|  ├── splash.png
+|  ├── tricycle_onboarding.png
+|  └── tricycle_transparent.png
+├── auto_offline_riders.sql
+├── babel.config.js
+├── COMPLETE_DATABASE_FIX.sql
+├── create_trips_and_transactions.sql
+├── eas.json
+├── ENABLE_REALTIME.sql
+├── FIX_DATABASE_ERRORS.sql
+├── FIX_MISSING_COLUMNS.sql
+├── fix_profiles_policy.sql
+├── fix_storage_policy.sql
+├── FIX_TRIGGERS.sql
+├── index.html
+├── null.txt
+├── package-lock.json
+├── package-rn.json
+├── package.json
+├── postcss.config.ts
+├── README-REACT-NATIVE.md
+├── SHA1_FINGERPRINT.txt
+├── src
+|  ├── App.tsx
+|  ├── components
+|  |  ├── common
+|  |  └── feature
+|  ├── contexts
+|  |  └── AuthContext.tsx
+|  ├── hooks
+|  |  ├── useNavigatrDirections.ts
+|  |  └── useOpenRouteDirections.ts
+|  ├── i18n
+|  |  ├── index.ts
+|  |  └── local
+|  ├── index.css
+|  ├── lib
+|  |  ├── api.ts
+|  |  ├── openRouteService.ts
+|  |  └── supabase.ts
+|  ├── main.tsx
+|  ├── mocks
+|  |  └── rider.ts
+|  ├── navigation
+|  |  ├── index.tsx
+|  |  └── RootNavigation.ts
+|  ├── pages
+|  |  ├── active-trip
+|  |  ├── audit-logs
+|  |  ├── auth
+|  |  ├── chat
+|  |  ├── home
+|  |  ├── NotFound.tsx
+|  |  ├── onboarding
+|  |  ├── profile
+|  |  ├── request
+|  |  ├── splash
+|  |  ├── support
+|  |  ├── suspended
+|  |  ├── tracking
+|  |  ├── trip-complete
+|  |  └── trips
+|  ├── router
+|  |  ├── config.tsx
+|  |  └── index.ts
+|  ├── services
+|  ├── types
+|  |  └── supabase.ts
+|  └── utils
+|     ├── colors.ts
+|     ├── orderLocation.ts
+|     └── styles.ts
+├── supabase_rider_setup.sql
+├── supabase_schema.sql
+├── tailwind.config.ts
+├── test-realtime.js
+├── tmp_orders.json
+├── tmp_tsc_output.txt
+├── tsc.txt
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+├── vite-env.d.ts
+└── vite.config.ts
+
+directory: 1382 file: 2591
+
+ignored: directory (48)

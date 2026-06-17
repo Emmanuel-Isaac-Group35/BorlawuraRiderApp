@@ -246,18 +246,9 @@ export default function ProfilePage() {
         
         {/* Profile Hero Section */}
         <View style={styles.heroSection}>
-          <TouchableOpacity onPress={() => handleDocumentUpdate('avatar')} style={styles.avatarContainer} activeOpacity={0.8} disabled={uploading === 'avatar'}>
+          <View style={styles.avatarContainer}>
             <Image source={{ uri: profile?.avatar_url || riderProfile.profilePhoto }} style={styles.avatar} />
-            {uploading === 'avatar' ? (
-              <View style={[styles.avatar, styles.avatarOverlay]}>
-                <RNActivityIndicator size="small" color="#fff" />
-              </View>
-            ) : (
-              <View style={styles.editAvatarBadge}>
-                <Ionicons name="camera" size={16} color="#ffffff" />
-              </View>
-            )}
-          </TouchableOpacity>
+          </View>
           <Text style={styles.heroName}>{displayName}</Text>
           <Text style={styles.heroPhone}>{displayPhone}</Text>
           
@@ -286,11 +277,9 @@ export default function ProfilePage() {
             { label: 'National ID (Ghana Card)', icon: 'id-card', verified: !!profile?.ghana_card_photo_url, type: 'ghana_card' },
             { label: 'Tricycle Registration', icon: 'car', verified: !!profile?.vehicle_photo_url, type: 'vehicle' },
           ].map((item, index, arr) => (
-            <TouchableOpacity 
+            <View 
               key={index} 
               style={[styles.moduleRow, index === arr.length - 1 && styles.noBorder]}
-              onPress={() => handleDocumentUpdate(item.type as any)}
-              disabled={uploading !== null}
             >
               <View style={styles.moduleRowLeft}>
                 <View style={styles.moduleIconBox}>
@@ -299,21 +288,19 @@ export default function ProfilePage() {
                 <Text style={styles.moduleLabel}>{item.label}</Text>
               </View>
               <View style={styles.moduleRowRight}>
-                 {uploading === item.type ? (
-                   <RNActivityIndicator size="small" color={colors.primary} />
-                 ) : item.verified ? (
+                 {item.verified ? (
                    <>
                      <Text style={styles.verifiedText}>Verified</Text>
                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
                    </>
                  ) : (
                    <>
-                     <Text style={[styles.verifiedText, { color: colors.error }]}>Update</Text>
-                     <Ionicons name="cloud-upload-outline" size={20} color={colors.error} />
+                     <Text style={[styles.verifiedText, { color: colors.gray[500] }]}>Pending</Text>
+                     <Ionicons name="time-outline" size={20} color={colors.gray[500]} />
                    </>
                  )}
               </View>
-            </TouchableOpacity>
+            </View>
           ))}
         </View>
 

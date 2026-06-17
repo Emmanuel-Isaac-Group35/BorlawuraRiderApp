@@ -17,6 +17,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../utils/colors';
 import { Toast } from '../../components/common/Toast';
+import { Modal } from '../../components/common/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -41,6 +42,15 @@ export default function SupportPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  const issueCategories = [
+    { id: 'trip', label: 'Trip Problem' },
+    { id: 'payment', label: 'Payment / Earnings' },
+    { id: 'app', label: 'App Issue' },
+    { id: 'account', label: 'Account / Profile' },
+    { id: 'other', label: 'Other' },
+  ];
 
   const faqs = [
     {
@@ -139,7 +149,7 @@ export default function SupportPage() {
           </View>
           <TouchableOpacity 
             style={styles.callButton}
-            onPress={() => Linking.openURL('tel:+233501234567')}
+            onPress={() => Linking.openURL('tel:0502209940')}
           >
              <Text style={styles.callButtonText}>Call</Text>
           </TouchableOpacity>
@@ -175,10 +185,16 @@ export default function SupportPage() {
                 </View>
                 <View style={styles.inputGroup}>
                    <Text style={styles.inputLabel}>Issue Category</Text>
-                   <View style={styles.selectField}>
-                      <Text style={styles.selectText}>Trip Problem</Text>
+                   <TouchableOpacity 
+                      style={styles.selectField} 
+                      onPress={() => setShowCategoryModal(true)}
+                      activeOpacity={0.7}
+                   >
+                      <Text style={styles.selectText}>
+                        {issueCategories.find(c => c.id === formData.issue)?.label || 'Select Category'}
+                      </Text>
                       <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
-                   </View>
+                   </TouchableOpacity>
                 </View>
                 <View style={styles.inputGroup}>
                    <Text style={styles.inputLabel}>Description</Text>
@@ -207,14 +223,14 @@ export default function SupportPage() {
 
              <Text style={styles.sectionHeader}>DIRECT CHANNELS</Text>
              <View style={styles.channelsCard}>
-                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('mailto:support@borlawura.com')}>
+                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('mailto:borlawuraapp@gmail.com')}>
                    <View style={styles.channelIconBox}><Ionicons name="mail" size={20} color={colors.primary} /></View>
-                   <Text style={styles.channelText}>support@borlawura.com</Text>
+                   <Text style={styles.channelText}>borlawuraapp@gmail.com</Text>
                 </TouchableOpacity>
                 <View style={styles.divider} />
-                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('https://wa.me/233501234567')}>
+                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('https://wa.me/233502209940')}>
                    <View style={[styles.channelIconBox, {backgroundColor: '#D1FAE5'}]}><Ionicons name="logo-whatsapp" size={20} color="#059669" /></View>
-                   <Text style={styles.channelText}>+233 50 123 4567</Text>
+                   <Text style={styles.channelText}>0502209940</Text>
                 </TouchableOpacity>
              </View>
           </View>
@@ -244,6 +260,39 @@ export default function SupportPage() {
         )}
 
       </ScrollView>
+
+      {/* Category Selection Modal */}
+      <Modal visible={showCategoryModal} onClose={() => setShowCategoryModal(false)}>
+        <Text style={styles.modalTitle}>Select Issue Category</Text>
+        <View style={styles.categoryList}>
+          {issueCategories.map(cat => (
+            <TouchableOpacity 
+              key={cat.id} 
+              style={[
+                styles.categoryOption, 
+                formData.issue === cat.id && styles.categoryOptionActive
+              ]}
+              onPress={() => {
+                setFormData({ ...formData, issue: cat.id });
+                setShowCategoryModal(false);
+              }}
+            >
+              <Text style={[
+                styles.categoryOptionText,
+                formData.issue === cat.id && styles.categoryOptionTextActive
+              ]}>
+                {cat.label}
+              </Text>
+              {formData.issue === cat.id && (
+                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity style={styles.submitBtn} onPress={() => setShowCategoryModal(false)}>
+          <Text style={styles.submitBtnText}>Close</Text>
+        </TouchableOpacity>
+      </Modal>
       <Toast visible={showSuccess} message="Report Submitted!" subtitle="We will be in touch shortly." type="success" onHide={() => setShowSuccess(false)} />
     </SafeAreaView>
   );
@@ -486,5 +535,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 22,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  categoryList: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+  },
+  categoryOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight + '20', // subtle tint
+  },
+  categoryOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#4B5563',
+  },
+  categoryOptionTextActive: {
+    color: colors.primaryDark,
+    fontWeight: '700',
   }
 });
