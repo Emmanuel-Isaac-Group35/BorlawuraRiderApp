@@ -1,17 +1,26 @@
+<<<<<<< HEAD
+import React, { useState, useEffect } from 'react';
+=======
 import React, { useState, useCallback } from 'react';
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   StatusBar,
+<<<<<<< HEAD
+  ActivityIndicator,
+  ScrollView, // VERIFIED IMPORT
+=======
   TextInput,
   FlatList,
   RefreshControl,
   ActivityIndicator,
   Modal,
   Image
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,14 +28,17 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../utils/colors';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { fetchTrips } from '../../lib/api';
-
 import { useAuth } from '../../contexts/AuthContext';
 
+<<<<<<< HEAD
+type SortOrder = 'desc' | 'asc';
+type FilterType = 'all' | 'completed' | 'pending' | 'active';
+
+export default function TripsPage() {
+  const navigation = useNavigation<any>();
+=======
 type RootStackParamList = {
   MainTabs: undefined;
   Home: undefined;
@@ -79,28 +91,75 @@ export default function TripsPage() {
     }
   }, [allTrips]);
 
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
   const { user } = useAuth();
+  const [trips, setTrips] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [filter, setFilter] = useState<FilterType>('all');
 
+<<<<<<< HEAD
+  useEffect(() => {
+    fetchTrips();
+  }, [sortOrder, filter]);
+=======
 
   React.useEffect(() => {
     if (user?.id) {
       loadTrips();
     }
   }, [user?.id]);
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 
-  const loadTrips = async () => {
-    if (!user?.id) return;
+  const fetchTrips = async () => {
+    setLoading(true);
     try {
-      const data = await fetchTrips(user.id);
-      // @ts-ignore
-      setAllTrips(data);
-    } catch (error) {
-      console.error('Error fetching trips:', error);
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .eq('rider_id', user?.id)
+        .order('created_at', { ascending: sortOrder === 'asc' });
+      if (filter !== 'all') query = query.eq('status', filter);
+      const { data, error } = await query;
+      if (error) throw error;
+      setTrips(data || []);
+    } catch (e) {
     } finally {
       setLoading(false);
     }
   };
 
+<<<<<<< HEAD
+  const renderFilterPill = (label: string, value: FilterType) => (
+    <TouchableOpacity style={[styles.filterPill, filter === value && styles.filterPillActive]} onPress={() => setFilter(value)}>
+       <Text style={[styles.filterText, filter === value && styles.filterTextActive]}>{label.toUpperCase()}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderTripItem = ({ item }: { item: any }) => (
+    <TouchableOpacity style={styles.tripCard} onPress={() => navigation.navigate('TripDetail', { trip: item })}>
+       <View style={styles.cardHeader}>
+          <View style={styles.statusBadge}>
+             <View style={[styles.statusDot, { backgroundColor: item.status === 'completed' ? '#10b981' : '#FBBF24' }]} />
+             <Text style={styles.statusText}>{item.status === 'completed' ? 'SUCCESS' : 'PENDING'}</Text>
+          </View>
+          <Text style={styles.dateText}>{new Date(item.created_at).toLocaleDateString()}</Text>
+       </View>
+       <View style={styles.cardBody}>
+          <View style={styles.locRow}>
+             <Ionicons name="location" size={18} color="#10b981" />
+             <Text style={styles.addressText} numberOfLines={1}>{item.address || 'Sector Coordinates'}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.metaRow}>
+             <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>SERVICE CLASS</Text>
+                <Text style={styles.metaValue}>PICKUP_UNIT</Text>
+             </View>
+             <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>MISSION_ID</Text>
+                <Text style={styles.metaValue}>#{item.id.slice(0, 8).toUpperCase()}</Text>
+=======
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadTrips();
@@ -334,8 +393,15 @@ export default function TripsPage() {
              <View>
                <Text style={styles.customerName}>{item.customerName || 'Unknown Customer'}</Text>
                <Text style={styles.tripDate}>{formatDate(item.date)} • {item.time}</Text>
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
              </View>
+             <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
           </View>
+<<<<<<< HEAD
+       </View>
+    </TouchableOpacity>
+  );
+=======
           <View style={[styles.statusBadge, (item.status === 'active' || item.status === 'accepted') ? { backgroundColor: '#DBEAFE' } : {}]}>
             <Ionicons 
               name={(item.status === 'active' || item.status === 'accepted') ? 'time' : 'checkmark-circle'} 
@@ -427,6 +493,7 @@ export default function TripsPage() {
     { id: 'instant', label: '⚡ Instant' },
     { id: 'scheduled', label: '📅 Scheduled' },
   ];
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 
   if (loading && !refreshing && allTrips.length === 0) {
     return (
@@ -457,6 +524,33 @@ export default function TripsPage() {
 
   return (
     <View style={styles.container}>
+<<<<<<< HEAD
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><Ionicons name="chevron-back" size={24} color="#0e3325" /></TouchableOpacity>
+           <Text style={styles.headerTitle}>OPERATIONAL MISSION LOGS</Text>
+           <TouchableOpacity onPress={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')} style={styles.sortBtn}>
+              <Ionicons name={sortOrder === 'desc' ? "arrow-down" : "arrow-up"} size={16} color="#10b981" />
+              <Text style={styles.sortBtnText}>{sortOrder === 'desc' ? 'LATEST' : 'CHRONO'}</Text>
+           </TouchableOpacity>
+        </View>
+
+        <View style={styles.filterBar}>
+           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+              {renderFilterPill('All Logs', 'all')}
+              {renderFilterPill('Executed', 'completed')}
+              {renderFilterPill('Active', 'active')}
+           </ScrollView>
+        </View>
+
+        {loading ? (
+          <View style={styles.center}><ActivityIndicator size="large" color="#10b981" /></View>
+        ) : (
+          <FlatList data={trips} renderItem={renderTripItem} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} ListEmptyComponent={<View style={styles.emptyBox}><Text style={styles.emptyTitle}>NO LOG ENTRIES DETECTED</Text></View>} />
+        )}
+      </SafeAreaView>
+=======
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       <LinearGradient
@@ -688,11 +782,45 @@ export default function TripsPage() {
           </View>
         </BlurView>
       </Modal>
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+<<<<<<< HEAD
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  backBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 11, fontFamily: 'Montserrat_900Black', color: '#0e3325', letterSpacing: 1.5 },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0fdf4', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, gap: 5 },
+  sortBtnText: { fontSize: 8, fontFamily: 'Montserrat_900Black', color: '#10b981' },
+  filterBar: { backgroundColor: '#fff', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  filterScroll: { paddingHorizontal: 20, gap: 10 },
+  filterPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#F1F5F9' },
+  filterPillActive: { backgroundColor: '#0e3325', borderColor: '#0e3325' },
+  filterText: { fontSize: 9, fontFamily: 'Montserrat_800ExtraBold', color: '#94A3B8' },
+  filterTextActive: { color: '#fff' },
+  listContent: { padding: 20, paddingBottom: 40 },
+  tripCard: { backgroundColor: '#fff', borderRadius: 24, padding: 20, marginBottom: 16, elevation: 5 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 6 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 8, fontFamily: 'Montserrat_900Black', color: '#0e3325' },
+  dateText: { fontSize: 9, fontFamily: 'Montserrat_800ExtraBold', color: '#9CA3AF' },
+  cardBody: { gap: 15 },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  addressText: { flex: 1, fontSize: 14, fontFamily: 'Montserrat_800ExtraBold', color: '#0e3325' },
+  divider: { height: 1, backgroundColor: '#F1F5F9' },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  metaItem: { gap: 2 },
+  metaLabel: { fontSize: 7, fontFamily: 'Montserrat_900Black', color: '#94A3B8', letterSpacing: 1 },
+  metaValue: { fontSize: 10, fontFamily: 'Montserrat_900Black', color: '#0e3325' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyBox: { alignItems: 'center', marginTop: 100 },
+  emptyTitle: { fontSize: 14, fontFamily: 'Montserrat_900Black', color: '#0e3325' }
+=======
   container: {
     flex: 1,
     backgroundColor: colors.backgroundGray,
@@ -1201,4 +1329,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   }
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 });

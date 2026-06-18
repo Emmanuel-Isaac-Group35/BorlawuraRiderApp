@@ -21,10 +21,13 @@ export default function PersonalInfoPage() {
     const { updateRegistrationData } = useAuth();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
+<<<<<<< HEAD
+=======
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
     const [languages, setLanguages] = useState<string[]>(['English']);
     const [showLangModal, setShowLangModal] = useState(false);
 
@@ -38,31 +41,19 @@ export default function PersonalInfoPage() {
         }
     };
 
-
     const handleBack = () => {
         navigation.goBack();
     };
 
     const handleNext = () => {
-        if (!firstName || !lastName || !password) {
+        if (!firstName || !lastName) {
             Alert.alert("Missing Information", "Please fill in all required fields.");
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            Alert.alert("Password Mismatch", "Passwords do not match.");
-            return;
-        }
-
-        if (password.length < 6) {
-            Alert.alert("Weak Password", "Password must be at least 6 characters.");
             return;
         }
 
         updateRegistrationData({
             first_name: firstName.trim(),
             last_name: lastName.trim(),
-            password: password.trim(),
             language: languages.join(', ') // Save as comma separated string for now as per schema
         });
         navigation.navigate('DriverLicense' as never);
@@ -116,11 +107,11 @@ export default function PersonalInfoPage() {
                             <Text style={styles.requiredStar}>*</Text>
                         </View>
                         <TextInput
-                            style={[styles.input, styles.inputError]} // Simulating error state from image
+                            style={styles.input}
                             value={firstName}
                             onChangeText={setFirstName}
+                            placeholder="e.g. John"
                         />
-                        <Text style={styles.errorText}>This field is required</Text>
                     </View>
 
                     {/* Last Name */}
@@ -130,9 +121,13 @@ export default function PersonalInfoPage() {
                             <Text style={styles.requiredStar}>*</Text>
                         </View>
                         <TextInput
-                            style={[styles.input, styles.inputError]}
+                            style={styles.input}
                             value={lastName}
                             onChangeText={setLastName}
+<<<<<<< HEAD
+                            placeholder="e.g. Doe"
+                        />
+=======
                         />
                         <Text style={styles.errorText}>This field is required</Text>
                     </View>
@@ -191,6 +186,7 @@ export default function PersonalInfoPage() {
                                 />
                             </TouchableOpacity>
                         </View>
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
                     </View>
 
                     {/* Language */}
@@ -218,15 +214,9 @@ export default function PersonalInfoPage() {
                         </TouchableOpacity>
                     </View>
 
-
-
-
-
-
                     <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
                         <Ionicons name="arrow-forward" size={24} color="#fff" />
                     </TouchableOpacity>
-
                 </ScrollView>
             </KeyboardAvoidingView>
 

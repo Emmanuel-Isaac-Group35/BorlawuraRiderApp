@@ -1,4 +1,9 @@
+<<<<<<< HEAD
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
+=======
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 import { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -69,6 +74,7 @@ const AuthContext = createContext<AuthContextType>({
     profile: null,
     loading: true,
     signOut: async () => { },
+    refreshProfile: async () => { },
     registrationData: {
         email: '',
         phone: '',
@@ -274,6 +280,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Global listener for new incoming orders
     useEffect(() => {
+<<<<<<< HEAD
+        // FIX: Wire up AppState listener so Supabase token refresh is properly paused when app goes to background
+    const handleAppStateChange = (state: string) => {
+        if (state === 'active') {
+            supabase.auth.startAutoRefresh();
+        } else {
+            supabase.auth.stopAutoRefresh();
+        }
+    };
+
+    const appStateSub = AppState.addEventListener('change', handleAppStateChange);
+    return () => appStateSub.remove();
+  }, []);
+=======
         // Only listen if the user is online
         if (!user || !profile?.is_online) return;
 
@@ -470,6 +490,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
         })();
     }, [profile?.is_online]);
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 
     const fetchProfile = async (userId: string) => {
         try {

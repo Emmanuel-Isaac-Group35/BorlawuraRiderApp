@@ -1,312 +1,130 @@
 import React, { useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    Platform,
-    KeyboardAvoidingView,
-    ScrollView,
-    Switch,
-    Alert
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  StatusBar,
+  Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
 
 export default function RegisterPage() {
-    const navigation = useNavigation();
-    const { updateRegistrationData } = useAuth();
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [city, setCity] = useState('Accra');
-    const [agreed, setAgreed] = useState(false);
+  const navigation = useNavigation<any>();
+  const { updateRegistrationData } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-    const handleBack = () => {
-        navigation.goBack();
-    };
+  const handleNext = async () => {
+    if (!email || !password || !phoneNumber) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
+    
+    updateRegistrationData({ email, password, phone: phoneNumber });
+    navigation.navigate('PersonalInfo');
+  };
 
-    const handleNext = () => {
-        const trimmedEmail = email.trim();
-        // Remove all non-numeric characters from phone
-        const cleanedPhone = phone.replace(/\D/g, ''); 
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <Ionicons name="chevron-back" size={24} color="#0e3325" />
+           </TouchableOpacity>
+        </View>
 
-        if (!trimmedEmail || !cleanedPhone) {
-            // Check if fields are empty (though specific validation below is better)
-            return;
-        }
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+           <View style={styles.heroBox}>
+              <Image source={require('../../../assets/BorlaWuraLogo.png')} style={styles.logo} />
+              <Text style={styles.title}>JOIN THE FLEET</Text>
+              <Text style={styles.subTitle}>Create your driver credentials to begin.</Text>
+           </View>
 
-        // Basic Email Validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(trimmedEmail)) {
-            Alert.alert("Invalid Email", "Please enter a valid email address.");
-            return;
-        }
+           <View style={styles.form}>
+              <View style={styles.inputGroup}>
+                 <Text style={styles.label}>EMAIL ADDRESS</Text>
+                 <TextInput 
+                   style={styles.input} 
+                   value={email} 
+                   onChangeText={setEmail} 
+                   placeholder="driver@borlawura.com" 
+                   autoCapitalize="none"
+                   keyboardType="email-address"
+                 />
+              </View>
 
-        updateRegistrationData({
-            email: trimmedEmail,
-            phone: cleanedPhone,
-            // Assuming city is part of profile or just local state for now, 
-            // but let's save what we can to context
-        });
-        navigation.navigate('PersonalInfo' as never);
-    };
+              <View style={styles.inputGroup}>
+                 <Text style={styles.label}>PHONE NUMBER</Text>
+                 <TextInput 
+                   style={styles.input} 
+                   value={phoneNumber} 
+                   onChangeText={setPhoneNumber} 
+                   placeholder="024XXXXXXX" 
+                   keyboardType="phone-pad"
+                 />
+              </View>
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={handleBack} style={styles.iconButton}>
-                    <Ionicons name="close" size={24} color="#000" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Register</Text>
-                <TouchableOpacity style={styles.langButton}>
-                    <Text style={styles.flag}>🇬🇭</Text>
-                    <Text style={styles.langText}>EN</Text>
-                </TouchableOpacity>
-            </View>
+              <View style={styles.inputGroup}>
+                 <Text style={styles.label}>PASSWORD</Text>
+                 <TextInput 
+                   style={styles.input} 
+                   value={password} 
+                   onChangeText={setPassword} 
+                   placeholder="••••••••" 
+                   secureTextEntry
+                 />
+              </View>
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
-            >
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    <Text style={styles.mainTitle}>Become a rider</Text>
+              <TouchableOpacity style={styles.mainBtn} onPress={handleNext} disabled={isLoading}>
+                 {isLoading ? <ActivityIndicator color="#fff" /> : (
+                   <>
+                     <Text style={styles.btnText}>CONTINUE REGISTRATION</Text>
+                     <Ionicons name="arrow-forward" size={24} color="#fff" />
+                   </>
+                 )}
+              </TouchableOpacity>
+           </View>
 
-                    {/* Email Field */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter email address"
-                            placeholderTextColor="#9ca3af"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-                    </View>
-
-                    {/* Phone Field */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Phone number</Text>
-                        <View style={styles.phoneRow}>
-                            <TouchableOpacity style={styles.countrySelector}>
-                                <Text style={styles.flag}>🇬🇭</Text>
-                                <Text style={styles.countryCode}>+233</Text>
-                                <Ionicons name="chevron-down" size={16} color="#000" />
-                            </TouchableOpacity>
-                            <TextInput
-                                style={styles.phoneInput}
-                                placeholder="Mobile number"
-                                placeholderTextColor="#9ca3af"
-                                value={phone}
-                                onChangeText={setPhone}
-                                keyboardType="phone-pad"
-                            />
-                        </View>
-                    </View>
-
-                    {/* City Field */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>City</Text>
-                        <View style={styles.cityInputContainer}>
-                            <Text style={styles.cityText}>{city}</Text>
-                            <View style={styles.cityActions}>
-                                <TouchableOpacity onPress={() => setCity('')}>
-                                    <Ionicons name="close-circle" size={20} color="#9ca3af" />
-                                </TouchableOpacity>
-                                <Ionicons name="chevron-down" size={20} color="#000" style={{ marginLeft: 8 }} />
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Terms Checkbox */}
-                    <View style={styles.checkboxContainer}>
-                        <TouchableOpacity
-                            style={[styles.checkbox, agreed && styles.checkboxChecked]}
-                            onPress={() => setAgreed(!agreed)}
-                        >
-                            {agreed && <Ionicons name="checkmark" size={16} color="#fff" />}
-                        </TouchableOpacity>
-                        <Text style={styles.termsText}>
-                            By registering, you agree to our <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy policy</Text>, commit to comply with obligations under the European Union and local legislation and provide only legal services and content on the Borla Wura Platform.
-                        </Text>
-                    </View>
-
-                    <Text style={styles.disclaimerText}>
-                        Once you've become a rider, we will occasionally send you offers and promotions related to our services. You can always unsubscribe by changing your communication preferences.
-                    </Text>
-
-                    {/* Submit Button */}
-                    <TouchableOpacity
-                        style={[styles.submitButton, !agreed ? styles.submitButtonDisabled : null]}
-                        disabled={!agreed}
-                        onPress={handleNext}
-                    >
-                        <Text style={styles.submitButtonText}>Register as a rider</Text>
-                    </TouchableOpacity>
-
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
-    );
+           <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account?</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('PhoneLogin')}>
+                 <Text style={styles.loginLink}>LOG IN</Text>
+              </TouchableOpacity>
+           </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#ffffff',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
-    },
-    iconButton: {
-        padding: 4,
-    },
-    headerTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    langButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    flag: {
-        fontSize: 16,
-    },
-    langText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    scrollContent: {
-        padding: 24,
-    },
-    mainTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 24,
-        color: '#000',
-    },
-    inputGroup: {
-        marginBottom: 20,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        color: '#1f2937',
-    },
-    input: {
-        backgroundColor: '#f3f4f6',
-        borderRadius: 8,
-        padding: 16,
-        fontSize: 16,
-        color: '#000',
-    },
-    phoneRow: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    countrySelector: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f3f4f6',
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        gap: 8,
-        height: 56,
-    },
-    countryCode: {
-        fontSize: 16,
-        color: '#000',
-        fontWeight: '500',
-    },
-    phoneInput: {
-        flex: 1,
-        backgroundColor: '#f3f4f6',
-        borderRadius: 8,
-        paddingHorizontal: 16,
-        fontSize: 16,
-        color: '#000',
-        height: 56,
-    },
-    cityInputContainer: {
-        backgroundColor: '#f3f4f6',
-        borderRadius: 8,
-        padding: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: 56,
-    },
-    cityText: {
-        fontSize: 16,
-        color: '#000',
-    },
-    cityActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    checkboxContainer: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 24,
-        marginTop: 8,
-    },
-    checkbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 4,
-        borderWidth: 2,
-        borderColor: '#d1d5db',
-        marginRight: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 2,
-    },
-    checkboxChecked: {
-        backgroundColor: '#10b981',
-        borderColor: '#10b981',
-    },
-    termsText: {
-        flex: 1,
-        fontSize: 13,
-        color: '#6b7280',
-        lineHeight: 20,
-    },
-    linkText: {
-        color: '#10b981',
-    },
-    disclaimerText: {
-        fontSize: 13,
-        color: '#6b7280',
-        lineHeight: 20,
-        marginBottom: 32,
-    },
-    submitButton: {
-        backgroundColor: '#10b981',
-        borderRadius: 30,
-        paddingVertical: 18,
-        alignItems: 'center',
-    },
-    submitButtonDisabled: {
-        backgroundColor: '#9ca3af',
-        opacity: 0.7,
-    },
-    submitButtonText: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
+  container: { flex: 1, backgroundColor: '#fff' },
+  safeArea: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingVertical: 15 },
+  backBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 12 },
+  scrollContent: { padding: 30, paddingBottom: 50 },
+  heroBox: { alignItems: 'center', marginBottom: 50 },
+  logo: { width: 100, height: 100, borderRadius: 25, marginBottom: 25 },
+  title: { fontSize: 24, fontFamily: 'Montserrat_900Black', color: '#0e3325', letterSpacing: 1 },
+  subTitle: { fontSize: 14, fontFamily: 'Montserrat_700Bold', color: '#94A3B8', textAlign: 'center', marginTop: 10 },
+  form: { gap: 25 },
+  inputGroup: { gap: 10 },
+  label: { fontSize: 8, fontFamily: 'Montserrat_900Black', color: '#94A3B8', letterSpacing: 1.5 },
+  input: { backgroundColor: '#F9FAFB', borderRadius: 20, padding: 20, fontSize: 14, fontFamily: 'Montserrat_800ExtraBold', color: '#0e3325', borderWidth: 1, borderColor: '#F1F5F9' },
+  mainBtn: { height: 74, backgroundColor: '#10b981', borderRadius: 24, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 15, marginTop: 20, elevation: 10 },
+  btnText: { color: '#fff', fontSize: 16, fontFamily: 'Montserrat_900Black', letterSpacing: 1 },
+  footer: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 40 },
+  footerText: { fontSize: 13, fontFamily: 'Montserrat_700Bold', color: '#94A3B8' },
+  loginLink: { fontSize: 13, fontFamily: 'Montserrat_900Black', color: '#10b981' }
 });

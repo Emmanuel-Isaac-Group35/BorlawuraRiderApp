@@ -1,449 +1,164 @@
 import React, { useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    Platform,
-    ScrollView,
-    Alert,
-    Image,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  StatusBar,
+  Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../../lib/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
+
+type DocType = 'license' | 'insurance' | 'permit';
 
 export default function DocumentsPage() {
-    const navigation = useNavigation();
-    const { registrationData, updateRegistrationData } = useAuth();
-    // Local state for 'uploaded' UI feedback could be added here
+  const navigation = useNavigation();
+  const [loading, setLoading] = useState(false);
+  
+  const [docs, setDocs] = useState({
+    license: { uri: null, status: 'verified' },
+    insurance: { uri: null, status: 'pending' },
+    permit: { uri: null, status: 'none' },
+  });
 
-    const handleBack = () => {
-        navigation.goBack();
-    };
+  const pickImage = async (type: DocType) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Camera access is required to upload documents.');
+      return;
+    }
 
-    const handleNext = () => {
-        navigation.navigate('VehicleDetails' as never);
-    };
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
 
-    const handleUpload = async (documentType: string) => {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'], // Updated from deprecated MediaTypeOptions
-                allowsEditing: true,
-                quality: 0.8,
-            });
+    if (!result.canceled) {
+      setDocs({
+        ...docs,
+        [type]: { uri: result.assets[0].uri, status: 'uploading' }
+      });
+      
+      // Simulate Upload
+      setTimeout(() => {
+        setDocs(prev => ({
+          ...prev,
+          [type]: { ...prev[type], status: 'pending' }
+        }));
+      }, 2000);
+    }
+  };
 
-            if (!result.canceled) {
-                const asset = result.assets[0];
-                const fileExt = asset.uri.split('.').pop();
-                const fileName = `${Date.now()}_${documentType}.${fileExt}`;
-                const filePath = `${fileName}`;
-
-                // Read the file as base64 (since React Native Expo filesystem access is limited for standard File objects in FormData on some versions, but Supabase supports base64 or ArrayBuffer)
-                // However, standard fetch with FormData works well in Expo modern versions.
-                // Let's use FormData which is the standard way.
-
-                const formData = new FormData();
-                formData.append('file', {
-                    uri: asset.uri,
-                    name: fileName,
-                    type: asset.mimeType || 'image/jpeg',
-                } as any);
-
-                const { data, error } = await supabase.storage
-                    .from('rider_documents')
-                    .upload(filePath, formData, {
-                        contentType: asset.mimeType || 'image/jpeg',
-                    });
-
-                if (error) throw error;
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('rider_documents')
-                    .getPublicUrl(filePath);
-
-                // Update context
-                let update: any = {};
-                if (documentType === 'profile_photo') update.avatar_url = publicUrl;
-                if (documentType === 'license_front') update.license_photo_url = publicUrl;
-                if (documentType === 'ghana_card') update.ghana_card_photo_url = publicUrl;
-
-                updateRegistrationData(update);
-                Alert.alert("Success", "Document uploaded successfully");
-            }
-        } catch (error: any) {
-            console.error(error);
-            Alert.alert("Upload Failed", error.message || "An error occurred while uploading");
-        }
-    };
+  const renderUploader = (type: DocType, title: string, subtitle: string) => {
+    const doc = docs[type];
+    const isVerified = doc.status === 'verified';
+    const isPending = doc.status === 'pending';
+    const isUploading = doc.status === 'uploading';
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={handleBack} style={styles.closeButton}>
-                    <Ionicons name="close" size={24} color="#000" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Register</Text>
-                <View style={{ width: 24 }} />
+      <View style={styles.uploaderCard}>
+         <View style={styles.cardHeader}>
+            <View>
+               <Text style={styles.cardTitle}>{title.toUpperCase()}</Text>
+               <Text style={styles.cardSub}>{subtitle}</Text>
             </View>
+            <View style={[styles.statusBadge, { backgroundColor: isVerified ? '#f0fdf4' : isPending ? '#eff6ff' : '#f9fafb' }]}>
+               <Text style={[styles.statusText, { color: isVerified ? '#10b981' : isPending ? '#3B82F6' : '#9CA3AF' }]}>
+                  {doc.status.toUpperCase()}
+               </Text>
+            </View>
+         </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Brand & Lang */}
-                <View style={styles.brandRow}>
-                    <View style={styles.logoContainer}>
-                        <Text style={styles.logoTextGreen}>Borla Wura </Text>
-                        <Text style={styles.logoTextBlack}>Rider</Text>
-                    </View>
-                    <TouchableOpacity style={styles.langButton}>
-                        <Ionicons name="globe-outline" size={16} color="#000" />
-                        <Text style={styles.langText}>English</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Progress Bar */}
-                <View style={styles.progressContainer}>
-                    <View style={[styles.progressSegment, styles.progressFilled]} />
-                    <View style={[styles.progressSegment, styles.progressFilled]} />
-                    <View style={[styles.progressSegment, styles.progressActive]} />
-                    <View style={styles.progressSegment} />
-                </View>
-
-                <Text style={styles.mainTitle}>Documents</Text>
-                <Text style={styles.subtitle}>
-                    We're legally required to ask you for some documents to sign you up as a rider. Documents scans and quality photos are accepted.
-                </Text>
-
-                <View style={styles.helpLinkContainer}>
-                    <Text style={styles.helpLinkText}>Need help getting documents? </Text>
-                    <TouchableOpacity>
-                        <Text style={styles.linkText}>Click here</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Document Items */}
-
-                {/* Profile Photo */}
-                <View style={styles.documentItem}>
-                    <View style={styles.labelRow}>
-                        <Text style={styles.label}>Rider's profile photo</Text>
-                        <Text style={styles.requiredStar}>*</Text>
-                    </View>
-                    <Text style={styles.description}>
-                        Please provide a clear portrait picture (not a full body picture) of yourself. It should show your full face, front view, with eyes open. Full body pictures or images with masks or dark-glasses will not accepted
-                    </Text>
-                    
-                    {registrationData.avatar_url ? (
-                        <View style={styles.previewRow}>
-                            <View style={styles.smallPreviewContainer}>
-                                <Image source={{ uri: registrationData.avatar_url }} style={styles.previewImage} />
-                                <TouchableOpacity style={styles.removeImageSmall} onPress={() => updateRegistrationData({ avatar_url: '' })}>
-                                    <Ionicons name="close" size={12} color="#fff" />
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.uploadStatus}>
-                                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-                                <Text style={styles.uploadedText}>Uploaded</Text>
-                            </View>
-                        </View>
-                    ) : (
-                        <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('profile_photo')}>
-                            <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
-                            <Text style={styles.uploadButtonText}>Upload file</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* License Front */}
-                <View style={styles.documentItem}>
-                    <View style={styles.labelRow}>
-                        <Text style={styles.label}>Rider's License Front</Text>
-                        <Text style={styles.requiredStar}>*</Text>
-                    </View>
-                    <Text style={styles.description}>
-                        Valid driver license issued by the Driver and Vehicle Licence Authority (DVLA). Borla Wura accepts both temporary and full-term licenses. Include a picture of the back of your temporary license if it has an extended expiration date
-                    </Text>
-
-                    {registrationData.license_photo_url ? (
-                        <View style={styles.previewRow}>
-                            <View style={styles.smallPreviewContainer}>
-                                <Image source={{ uri: registrationData.license_photo_url }} style={styles.previewImage} />
-                                <TouchableOpacity style={styles.removeImageSmall} onPress={() => updateRegistrationData({ license_photo_url: '' })}>
-                                    <Ionicons name="close" size={12} color="#fff" />
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.uploadStatus}>
-                                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-                                <Text style={styles.uploadedText}>Uploaded</Text>
-                            </View>
-                        </View>
-                    ) : (
-                        <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('license_front')}>
-                            <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
-                            <Text style={styles.uploadButtonText}>Upload file</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Ghana Card */}
-                <View style={styles.documentItem}>
-                    <View style={styles.labelRow}>
-                        <Text style={styles.label}>Ghana Card</Text>
-                    </View>
-                    <Text style={styles.description}>
-                        Please upload a front view of your Ghana Card
-                    </Text>
-
-                    {registrationData.ghana_card_photo_url ? (
-                        <View style={styles.previewRow}>
-                            <View style={styles.smallPreviewContainer}>
-                                <Image source={{ uri: registrationData.ghana_card_photo_url }} style={styles.previewImage} />
-                                <TouchableOpacity style={styles.removeImageSmall} onPress={() => updateRegistrationData({ ghana_card_photo_url: '' })}>
-                                    <Ionicons name="close" size={12} color="#fff" />
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.uploadStatus}>
-                                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-                                <Text style={styles.uploadedText}>Uploaded</Text>
-                            </View>
-                        </View>
-                    ) : (
-                        <TouchableOpacity style={styles.uploadButton} onPress={() => handleUpload('ghana_card')}>
-                            <Ionicons name="add" size={20} color="#000" style={{ marginRight: 8 }} />
-                            <Text style={styles.uploadButtonText}>Upload file</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Navigation Buttons */}
-                <View style={styles.buttonContainer}>
-                    <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                        <Text style={styles.backButtonText}>Back</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                        <Text style={styles.nextButtonText}>Next</Text>
-                    </TouchableOpacity>
-                </View>
-
-            </ScrollView>
-        </SafeAreaView>
+         <TouchableOpacity 
+           style={[styles.uploadBox, isVerified && styles.verifiedBox]} 
+           onPress={() => !isVerified && pickImage(type)}
+           disabled={isVerified || isUploading}
+         >
+            {isUploading ? (
+              <ActivityIndicator color="#10b981" />
+            ) : doc.uri ? (
+              <Image source={{ uri: doc.uri }} style={styles.preview} />
+            ) : isVerified ? (
+              <View style={styles.verifiedContent}>
+                 <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+                 <Text style={styles.verifiedLabel}>DOCUMENT VERIFIED</Text>
+              </View>
+            ) : (
+              <>
+                 <Ionicons name="camera-outline" size={32} color="#10b981" />
+                 <Text style={styles.uploadLabel}>TAP TO CAPTURE</Text>
+              </>
+            )}
+         </TouchableOpacity>
+      </View>
     );
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <Ionicons name="chevron-back" size={24} color="#0e3325" />
+           </TouchableOpacity>
+           <Text style={styles.headerTitle}>VERIFICATION VAULT</Text>
+           <View style={{ width: 44 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+           <View style={styles.infoBanner}>
+              <Ionicons name="shield-checkmark" size={24} color="#fff" />
+              <View style={styles.infoTextContainer}>
+                 <Text style={styles.infoTitle}>SECURE DOCUMENTS</Text>
+                 <Text style={styles.infoSub}>Your data is encrypted and used only for fleet verification purposes.</Text>
+              </View>
+           </View>
+
+           {renderUploader('license', "Driver's License", "Front view of your valid driving license")}
+           {renderUploader('insurance', "Vehicle Insurance", "Official insurance policy document")}
+           {renderUploader('permit', "Operational Permit", "Business or waste collection permit")}
+
+           <TouchableOpacity style={styles.saveBtn} onPress={() => navigation.navigate('VehicleDetails' as never)}>
+              <Text style={styles.saveBtnText}>NEXT: VEHICLE DETAILS</Text>
+           </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#ffffff',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-    },
-    closeButton: {
-        padding: 4,
-    },
-    headerTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    scrollContent: {
-        padding: 24,
-        paddingBottom: 40,
-    },
-    brandRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    logoContainer: {
-        flexDirection: 'row',
-    },
-    logoTextGreen: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#10b981',
-    },
-    logoTextBlack: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    langButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f3f4f6',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        gap: 6,
-    },
-    langText: {
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    progressContainer: {
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 32,
-    },
-    progressSegment: {
-        flex: 1,
-        height: 4,
-        backgroundColor: '#f3f4f6',
-        borderRadius: 2,
-    },
-    progressFilled: {
-        backgroundColor: '#10b981',
-        opacity: 0.5,
-    },
-    progressActive: {
-        backgroundColor: '#10b981',
-    },
-    mainTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        color: '#000',
-    },
-    subtitle: {
-        fontSize: 14,
-        color: '#6b7280',
-        marginBottom: 16,
-        lineHeight: 20,
-    },
-    helpLinkContainer: {
-        flexDirection: 'row',
-        marginBottom: 32,
-        flexWrap: 'wrap',
-    },
-    helpLinkText: {
-        fontSize: 14,
-        color: '#000',
-    },
-    linkText: {
-        fontSize: 14,
-        color: '#10b981',
-        textDecorationLine: 'underline',
-    },
-    documentItem: {
-        marginBottom: 32,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
-        paddingBottom: 24,
-    },
-    labelRow: {
-        flexDirection: 'row',
-        marginBottom: 8,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    requiredStar: {
-        color: '#ef4444',
-        marginLeft: 4,
-    },
-    description: {
-        fontSize: 14,
-        color: '#6b7280',
-        lineHeight: 20,
-        marginBottom: 16,
-    },
-    uploadButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
-        borderRadius: 30, // Rounded pill shape
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        alignSelf: 'flex-start',
-    },
-    uploadButtonText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    previewRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginTop: 8,
-    },
-    smallPreviewContainer: {
-        position: 'relative',
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        overflow: 'hidden',
-        backgroundColor: '#f3f4f6',
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-    },
-    previewImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    removeImageSmall: {
-        position: 'absolute',
-        top: 2,
-        right: 2,
-        backgroundColor: 'rgba(239, 68, 68, 0.9)',
-        borderRadius: 10,
-        width: 18,
-        height: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    uploadStatus: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    uploadedText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#10b981',
-    },
-    buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20,
-        gap: 16,
-    },
-    backButton: {
-        flex: 1,
-        backgroundColor: '#f3f4f6',
-        paddingVertical: 16,
-        borderRadius: 30,
-        alignItems: 'center',
-    },
-    backButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    nextButton: {
-        flex: 1,
-        backgroundColor: '#10b981',
-        paddingVertical: 16,
-        borderRadius: 30,
-        alignItems: 'center',
-    },
-    nextButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  safeArea: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 15, backgroundColor: '#fff' },
+  backBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 12, fontFamily: 'Montserrat_900Black', color: '#0e3325', letterSpacing: 2 },
+  scrollContent: { padding: 24, paddingBottom: 40 },
+  infoBanner: { flexDirection: 'row', backgroundColor: '#0e3325', borderRadius: 24, padding: 20, marginBottom: 30, alignItems: 'center', gap: 16 },
+  infoTextContainer: { flex: 1 },
+  infoTitle: { color: '#10b981', fontSize: 10, fontFamily: 'Montserrat_900Black', letterSpacing: 1 },
+  infoSub: { color: 'rgba(255,255,255,0.6)', fontSize: 8, fontFamily: 'Montserrat_800ExtraBold', marginTop: 2 },
+  uploaderCard: { backgroundColor: '#fff', borderRadius: 32, padding: 24, marginBottom: 20, elevation: 4, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 15 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  cardTitle: { fontSize: 12, fontFamily: 'Montserrat_900Black', color: '#0e3325', letterSpacing: 0.5 },
+  cardSub: { fontSize: 8, fontFamily: 'Montserrat_800ExtraBold', color: '#9CA3AF', marginTop: 2 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  statusText: { fontSize: 7, fontFamily: 'Montserrat_900Black', letterSpacing: 1 },
+  uploadBox: { height: 160, borderRadius: 24, backgroundColor: '#f9fafb', borderStyle: 'dashed', borderWidth: 2, borderColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  verifiedBox: { borderStyle: 'solid', borderColor: '#f0fdf4', backgroundColor: '#f0fdf4' },
+  preview: { width: '100%', height: '100%' },
+  uploadLabel: { fontSize: 8, fontFamily: 'Montserrat_900Black', color: '#10b981', marginTop: 10, letterSpacing: 1 },
+  verifiedContent: { alignItems: 'center' },
+  verifiedLabel: { fontSize: 9, fontFamily: 'Montserrat_900Black', color: '#10b981', marginTop: 10 },
+  saveBtn: { height: 64, backgroundColor: '#10b981', borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginTop: 20, shadowColor: '#10b981', shadowOpacity: 0.3, shadowRadius: 15, elevation: 10 },
+  saveBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Montserrat_900Black', letterSpacing: 1 }
 });

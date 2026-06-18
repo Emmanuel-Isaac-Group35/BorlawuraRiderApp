@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Pages
 import HomePage from '../pages/home';
 import TripsPage from '../pages/trips';
+import TripDetailPage from '../pages/trips/TripDetailPage';
 import TrackingPage from '../pages/tracking';
 import ProfilePage from '../pages/profile';
 import RequestPage from '../pages/request';
@@ -16,6 +17,7 @@ import TripCompletePage from '../pages/trip-complete';
 import SupportPage from '../pages/support';
 import ChatPage from '../pages/chat';
 import NotFound from '../pages/NotFound';
+import SettingsPage from '../pages/profile/SettingsPage';
 import AuthPage from '../pages/auth';
 import AuditLogsPage from '../pages/audit-logs';
 import { useAuth } from '../contexts/AuthContext';
@@ -94,7 +96,6 @@ function MainTabs() {
 
 export function AppNavigator() {
   const { session, loading } = useAuth();
-  const Stack = createNativeStackNavigator();
 
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
@@ -110,6 +111,42 @@ export function AppNavigator() {
   }
 
   return (
+<<<<<<< HEAD
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+      }}
+    >
+      {!session ? (
+        <>
+          <Stack.Screen name="Onboarding" component={OnboardingPage} />
+          <Stack.Screen name="Auth" component={AuthPage} />
+          <Stack.Screen name="PhoneLogin" component={PhoneLoginPage} />
+          <Stack.Screen name="Register" component={RegisterPage} />
+          <Stack.Screen name="PersonalInfo" component={PersonalInfoPage} />
+          <Stack.Screen name="DriverLicense" component={DriverLicensePage} />
+          <Stack.Screen name="Documents" component={DocumentsPage} />
+          <Stack.Screen name="VehicleDetails" component={VehicleDetailsPage} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="Request" component={RequestPage} />
+          <Stack.Screen name="ActiveTrip" component={ActiveTripPage} />
+          <Stack.Screen name="Tracking" component={TrackingPage} />
+          <Stack.Screen name="TripComplete" component={TripCompletePage} />
+          <Stack.Screen name="Trips" component={TripsPage} />
+          <Stack.Screen name="TripDetail" component={TripDetailPage} />
+          <Stack.Screen name="Profile" component={ProfilePage} />
+          <Stack.Screen name="Support" component={SupportPage} />
+          <Stack.Screen name="Settings" component={SettingsPage} />
+          <Stack.Screen name="AuditLogs" component={AuditLogsPage} />
+          <Stack.Screen name="NotFound" component={NotFound} />
+        </>
+      )}
+    </Stack.Navigator>
+=======
     <>
       <NetworkBanner />
       <Stack.Navigator
@@ -145,6 +182,7 @@ export function AppNavigator() {
         )}
       </Stack.Navigator>
     </>
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
   );
 }
 

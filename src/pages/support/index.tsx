@@ -3,128 +3,52 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  StatusBar,
   TextInput,
-  Linking,
-  ActivityIndicator,
+  ScrollView,
+  StatusBar,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../utils/colors';
-import { Toast } from '../../components/common/Toast';
-import { Modal } from '../../components/common/Modal';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
-type RootStackParamList = {
-  MainTabs: undefined;
-};
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-type TabType = 'contact' | 'faq';
-
 export default function SupportPage() {
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('contact');
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    issue: 'trip',
-    description: '',
-  });
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-
-  const issueCategories = [
-    { id: 'trip', label: 'Trip Problem' },
-    { id: 'payment', label: 'Payment / Earnings' },
-    { id: 'app', label: 'App Issue' },
-    { id: 'account', label: 'Account / Profile' },
-    { id: 'other', label: 'Other' },
-  ];
-
-  const faqs = [
-    {
-      question: 'How do I accept a pickup request?',
-      answer: "When you receive a new pickup request, you'll see a notification with trip details. Review the information and tap 'Accept' within 15 seconds to confirm the trip.",
-    },
-    {
-      question: 'What should I do if the customer is not available?',
-      answer: "Try calling or messaging the customer through the app. If they don't respond after 10 minutes, contact support and we'll help resolve the issue.",
-    },
-    {
-      question: 'How is my fare calculated?',
-      answer: "Fares are calculated based on distance, waste type, and current demand. You'll see the estimated fare before accepting any trip.",
-    },
-    {
-      question: 'Can I cancel a trip after accepting?',
-      answer: 'Trip cancellations should be avoided as they affect your rating. If you must cancel due to an emergency, contact support immediately.',
-    },
-    {
-      question: 'How do I update my vehicle information?',
-      answer: 'Go to your Profile, tap on Verification Status, and you can update your tricycle registration and insurance documents.',
-    },
-  ];
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.phone || !formData.description) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!subject || !message) {
+      Alert.alert('Error', 'Please provide a subject and message.');
       return;
     }
-
-    if (formData.description.trim().length < 10) {
-      Alert.alert('Error', 'Please provide more details (at least 10 characters)');
-      return;
-    }
-
-    if (!user?.id) {
-      Alert.alert('Error', 'You must be logged in to submit a support ticket.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('audit_logs').insert({
-        target_id: user.id,
-        target_type: 'riders',
-        action: 'support_ticket',
-        details: {
-          name: formData.name,
-          phone: formData.phone,
-          issue: formData.issue,
-          description: formData.description,
-        }
+      const { error } = await supabase.from('support_tickets').insert({
+        user_id: user?.id,
+        subject,
+        message,
+        status: 'open',
       });
-
-      if (!error) {
-        setShowSuccess(true);
-        setFormData({ name: '', phone: '', issue: 'trip', description: '' });
-        setTimeout(() => setShowSuccess(false), 3000);
-      } else {
-        console.error('Supabase Support Error:', error);
-        Alert.alert('Error', `Failed to submit: ${error?.message || 'Please try again.'}`);
-      }
+      if (error) throw error;
+      Alert.alert('Success', 'Your support ticket has been submitted.');
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Error', 'Could not submit ticket.');
     } catch (error: any) {
       console.error('Supabase Catch Error:', error);
       Alert.alert('Error', `An error occurred: ${error?.message || 'Please try again.'}`);
+
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const toggleFaq = (index: number) => {
-    setExpandedFaq(expandedFaq === index ? null : index);
   };
 
   return (

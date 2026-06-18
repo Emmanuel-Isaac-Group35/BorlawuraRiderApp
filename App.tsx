@@ -8,6 +8,21 @@ import { NavigationContainer } from '@react-navigation/native';
 import i18n from './src/i18n';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { AppNavigator } from './src/navigation';
+<<<<<<< HEAD
+import { StyleSheet, ActivityIndicator, View } from 'react-native';
+import { 
+  useFonts,
+  Montserrat_100Thin,
+  Montserrat_200ExtraLight,
+  Montserrat_300Light,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+  Montserrat_800ExtraBold,
+  Montserrat_900Black 
+} from '@expo-google-fonts/montserrat';
+=======
 import { navigationRef } from './src/navigation/RootNavigation';
 import { StyleSheet, LogBox } from 'react-native';
 
@@ -15,8 +30,29 @@ LogBox.ignoreLogs([
   '`expo-notifications` functionality is not fully supported',
   '[expo-av]: Expo AV has been deprecated',
 ]);
+>>>>>>> 3fa97034ddd6b5cb3a310cb147955c8c0527fc9c
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Montserrat_100Thin,
+    Montserrat_200ExtraLight,
+    Montserrat_300Light,
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
+    Montserrat_900Black,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e3325' }}>
+        <ActivityIndicator size="large" color="#10b981" />
+      </View>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
@@ -38,10 +74,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
-
-
-
-
-
-
