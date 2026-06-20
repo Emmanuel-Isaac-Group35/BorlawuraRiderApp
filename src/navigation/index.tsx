@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,13 +61,14 @@ function MainTabs() {
           backgroundColor: '#ffffff',
           borderTopColor: '#e5e7eb',
           borderTopWidth: 1,
-          paddingBottom: 5,
+          paddingBottom: Platform.OS === 'android' ? 15 : 25,
           paddingTop: 5,
-          height: 60,
+          height: Platform.OS === 'android' ? 70 : 85,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
+          paddingBottom: Platform.OS === 'android' ? 5 : 0,
         },
       })}
     >

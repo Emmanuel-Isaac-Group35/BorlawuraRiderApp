@@ -8,6 +8,7 @@ export type Profile = {
     full_name: string | null;
     language: string | null;
     rider_license_number: string | null;
+    tricycle_number: string | null;
     avatar_url: string | null;
     license_photo_url: string | null;
     ghana_card_photo_url: string | null;

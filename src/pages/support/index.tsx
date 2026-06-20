@@ -83,15 +83,12 @@ export default function SupportPage() {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('audit_logs').insert({
+      const { error } = await supabase.from('feedback').insert({
         user_id: user.id,
-        action: 'support_ticket',
-        details: {
-          name: formData.name,
-          phone: formData.phone,
-          issue: formData.issue,
-          description: formData.description,
-        }
+        name: formData.name,
+        phone: formData.phone,
+        issue: formData.issue,
+        description: formData.description,
       });
 
       if (!error) {
@@ -99,6 +96,7 @@ export default function SupportPage() {
         setFormData({ name: '', phone: '', issue: 'trip', description: '' });
         setTimeout(() => setShowSuccess(false), 3000);
       } else {
+        console.error('Supabase insert error:', error);
         Alert.alert('Error', 'Failed to submit. Please try again.');
       }
     } catch (error) {
@@ -139,7 +137,7 @@ export default function SupportPage() {
           </View>
           <TouchableOpacity 
             style={styles.callButton}
-            onPress={() => Linking.openURL('tel:+233501234567')}
+            onPress={() => Linking.openURL('tel:+233502209940')}
           >
              <Text style={styles.callButtonText}>Call</Text>
           </TouchableOpacity>
@@ -171,14 +169,24 @@ export default function SupportPage() {
                 </View>
                 <View style={styles.inputGroup}>
                    <Text style={styles.inputLabel}>Phone Number</Text>
-                   <TextInput style={styles.inputField} placeholder="050 123 4567" keyboardType="phone-pad" value={formData.phone} onChangeText={t => setFormData({...formData, phone: t})} />
+                   <TextInput style={styles.inputField} placeholder="050 220 9940" keyboardType="phone-pad" value={formData.phone} onChangeText={t => setFormData({...formData, phone: t})} />
                 </View>
                 <View style={styles.inputGroup}>
                    <Text style={styles.inputLabel}>Issue Category</Text>
-                   <View style={styles.selectField}>
-                      <Text style={styles.selectText}>Trip Problem</Text>
+                   <TouchableOpacity 
+                     style={styles.selectField}
+                     onPress={() => {
+                       Alert.alert('Select Category', '', [
+                         { text: 'Account / Profile', onPress: () => setFormData({...formData, issue: 'Account / Profile'}) },
+                         { text: 'Trip Problem', onPress: () => setFormData({...formData, issue: 'Trip Problem'}) },
+                         { text: 'Payment Issue', onPress: () => setFormData({...formData, issue: 'Payment Issue'}) },
+                         { text: 'Cancel', style: 'cancel' }
+                       ]);
+                     }}
+                   >
+                      <Text style={styles.selectText}>{formData.issue === 'trip' ? 'Select an issue' : formData.issue}</Text>
                       <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
-                   </View>
+                   </TouchableOpacity>
                 </View>
                 <View style={styles.inputGroup}>
                    <Text style={styles.inputLabel}>Description</Text>
@@ -207,14 +215,19 @@ export default function SupportPage() {
 
              <Text style={styles.sectionHeader}>DIRECT CHANNELS</Text>
              <View style={styles.channelsCard}>
-                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('mailto:support@borlawura.com')}>
+                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('mailto:borlawuraapp@gmail.com')}>
                    <View style={styles.channelIconBox}><Ionicons name="mail" size={20} color={colors.primary} /></View>
-                   <Text style={styles.channelText}>support@borlawura.com</Text>
+                   <Text style={styles.channelText}>borlawuraapp@gmail.com</Text>
                 </TouchableOpacity>
                 <View style={styles.divider} />
-                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('https://wa.me/233501234567')}>
+                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('https://wa.me/233502209940')}>
                    <View style={[styles.channelIconBox, {backgroundColor: '#D1FAE5'}]}><Ionicons name="logo-whatsapp" size={20} color="#059669" /></View>
-                   <Text style={styles.channelText}>+233 50 123 4567</Text>
+                   <Text style={styles.channelText}>+233 50 220 9940</Text>
+                </TouchableOpacity>
+                <View style={styles.divider} />
+                <TouchableOpacity style={styles.channelRow} onPress={() => Linking.openURL('tel:+233502209940')}>
+                   <View style={[styles.channelIconBox, {backgroundColor: '#E0E7FF'}]}><Ionicons name="call" size={20} color="#4F46E5" /></View>
+                   <Text style={styles.channelText}>+233 50 220 9940</Text>
                 </TouchableOpacity>
              </View>
           </View>

@@ -77,6 +77,7 @@ const AuthContext = createContext<AuthContextType>({
         password: '',
         language: 'English',
         rider_license_number: '',
+        tricycle_number: '',
         avatar_url: '',
         license_photo_url: '',
         ghana_card_photo_url: '',
@@ -107,6 +108,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password: '',
         language: 'English',
         rider_license_number: '',
+        tricycle_number: '',
         avatar_url: '',
         license_photo_url: '',
         ghana_card_photo_url: '',
@@ -187,6 +189,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (error) {
                 console.error('Session error (clearing local session):', error.message);
                 await supabase.auth.signOut();
+                setSession(null);
+                setUser(null);
+                setLoading(false);
+                return;
             }
             setSession(session);
             setUser(session?.user ?? null);

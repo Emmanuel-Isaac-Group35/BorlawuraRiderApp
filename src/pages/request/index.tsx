@@ -437,7 +437,7 @@ export default function RequestPage() {
           <View style={styles.mapContainer}>
             <MapView
               style={styles.map}
-              initialRegion={{
+              region={{
                 latitude: request.coordinates.lat,
                 longitude: request.coordinates.lng,
                 latitudeDelta: 0.01,

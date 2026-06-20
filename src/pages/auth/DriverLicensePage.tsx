@@ -18,18 +18,20 @@ export default function DriverLicensePage() {
     const navigation = useNavigation();
     const { updateRegistrationData } = useAuth();
     const [licenseNumber, setLicenseNumber] = useState('');
+    const [tricycleNumber, setTricycleNumber] = useState('');
 
     const handleBack = () => {
         navigation.goBack();
     };
 
     const handleNext = () => {
-        if (!licenseNumber) {
+        if (!licenseNumber || !tricycleNumber) {
             // Validation
             return;
         }
         updateRegistrationData({
-            rider_license_number: licenseNumber
+            rider_license_number: licenseNumber,
+            tricycle_number: tricycleNumber
         });
         navigation.navigate('Documents' as never);
     };
@@ -89,6 +91,22 @@ export default function DriverLicensePage() {
                             placeholderTextColor="#9ca3af"
                         />
                         <Text style={styles.helperText}>License number on your Rider's documents</Text>
+                    </View>
+
+                    {/* Tricycle Number */}
+                    <View style={styles.inputGroup}>
+                        <View style={styles.labelRow}>
+                            <Text style={styles.label}>Tricycle Number</Text>
+                            <Text style={styles.requiredStar}>*</Text>
+                        </View>
+                        <TextInput
+                            style={styles.input}
+                            value={tricycleNumber}
+                            onChangeText={setTricycleNumber}
+                            placeholder="GW 123 26"
+                            placeholderTextColor="#9ca3af"
+                        />
+                        <Text style={styles.helperText}>Registration number of your tricycle</Text>
                     </View>
 
                     <View style={styles.buttonContainer}>
