@@ -67,6 +67,7 @@ export default function TripCompletePage() {
     wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
     distance: Number(dbTrip?.distance_value || dbTrip?.distance || 1.2).toFixed(1),
     duration: calculateDuration(),
+    fare: Number(dbTrip?.fare || 0).toFixed(2),
     date: new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -131,6 +132,16 @@ export default function TripCompletePage() {
                   <View style={styles.itemContent}>
                     <Text style={styles.itemLabel}>Pickup</Text>
                     <Text style={styles.itemValue} numberOfLines={1}>{tripData.pickupLocation}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <View style={[styles.iconBox, { backgroundColor: '#DCFCE7' }]}>
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.primaryDark }}>₵</Text>
+                  </View>
+                  <View style={styles.itemContent}>
+                    <Text style={styles.itemLabel}>Amount Earned</Text>
+                    <Text style={[styles.itemValue, { color: colors.primaryDark, fontSize: 18, fontWeight: '800' }]}>₵{tripData.fare}</Text>
                   </View>
                 </View>
               </View>

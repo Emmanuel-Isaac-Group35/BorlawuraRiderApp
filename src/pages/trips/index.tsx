@@ -174,6 +174,10 @@ export default function TripsPage() {
     ? (ratedTrips.reduce((sum, trip) => sum + trip.rating, 0) / ratedTrips.length).toFixed(1)
     : '0.0';
 
+  const totalEarnings = filteredTrips
+    .filter(t => t.status === 'completed')
+    .reduce((sum, trip) => sum + (trip.fare || 0), 0);
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
@@ -299,6 +303,10 @@ export default function TripsPage() {
                 <div class="detail-item">
                   <div class="detail-label">Service Type</div>
                   <div class="detail-value">${trip.pickupType || 'Instant'}</div>
+                </div>
+                <div class="detail-item full-width">
+                  <div class="detail-label">Total Fare</div>
+                  <div class="detail-value" style="color: #059669; font-size: 24px;">₵${trip.fare ? trip.fare.toFixed(2) : '0.00'}</div>
                 </div>
               </div>
 
@@ -482,7 +490,15 @@ export default function TripsPage() {
               <Ionicons name="leaf-outline" size={24} color={colors.primaryDark} />
             </View>
             <Text style={styles.statValue}>{filteredTrips.length}</Text>
-            <Text style={styles.statLabel}>Completed Pickups</Text>
+            <Text style={styles.statLabel}>Pickups</Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.4)' }]}>
+            <View style={[styles.statIconWrapper, { backgroundColor: 'rgba(255,255,255,0.9)' }]}>
+              <Ionicons name="wallet-outline" size={24} color={colors.primaryDark} />
+            </View>
+            <Text style={styles.statValue}>₵{totalEarnings.toFixed(2)}</Text>
+            <Text style={styles.statLabel}>Earnings</Text>
           </View>
 
           <View style={[styles.statCard, { backgroundColor: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.4)' }]}>
@@ -490,7 +506,7 @@ export default function TripsPage() {
               <Ionicons name="star-outline" size={24} color={colors.amber[600]} />
             </View>
             <Text style={styles.statValue}>{averageRating}</Text>
-            <Text style={styles.statLabel}>Average Rating</Text>
+            <Text style={styles.statLabel}>Rating</Text>
           </View>
         </View>
 
