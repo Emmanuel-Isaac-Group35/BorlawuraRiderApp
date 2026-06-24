@@ -34,7 +34,7 @@ export default function TripCompletePage() {
               </div>
             </div>
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Trip Completed!</h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Waste Successfully Completed</h1>
           <p className="text-slate-500 font-medium mt-1">Thanks for completing this pickup.</p>
         </div>
 

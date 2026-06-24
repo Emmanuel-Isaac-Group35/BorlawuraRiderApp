@@ -67,7 +67,7 @@ export default function TripCompletePage() {
     wasteType: dbTrip?.waste_type || dbTrip?.waste_size || 'General Waste',
     distance: Number(dbTrip?.distance_value || dbTrip?.distance || 1.2).toFixed(1),
     duration: calculateDuration(),
-    fare: Number(dbTrip?.fare || 0).toFixed(2),
+    fare: Number(dbTrip?.fare || dbTrip?.amount || 0).toFixed(2),
     date: new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -103,7 +103,7 @@ export default function TripCompletePage() {
                   </LinearGradient>
                 </View>
               </View>
-              <Text style={styles.title}>Trip Completed!</Text>
+              <Text style={styles.title}>Waste Successfully Completed</Text>
               <Text style={styles.subtitle}>Thanks for completing this pickup.</Text>
             </View>
 
@@ -267,6 +267,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: 8,
     letterSpacing: -0.5,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,

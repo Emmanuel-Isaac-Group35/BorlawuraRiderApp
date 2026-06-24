@@ -59,6 +59,7 @@ export default function TripsPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
+  const [overallRating, setOverallRating] = useState('0.0');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -94,6 +95,21 @@ export default function TripsPage() {
       const data = await fetchTrips(user.id);
       // @ts-ignore
       setAllTrips(data);
+
+      // Fetch overall rating from all orders directly from database
+      const { data: ratingData } = await supabase
+        .from('orders')
+        .select('rating')
+        .eq('rider_id', user.id)
+        .not('rating', 'is', null)
+        .gt('rating', 0);
+        
+      if (ratingData && ratingData.length > 0) {
+        const avg = ratingData.reduce((sum, order) => sum + Number(order.rating), 0) / ratingData.length;
+        setOverallRating(avg.toFixed(1));
+      } else {
+        setOverallRating('0.0');
+      }
     } catch (error) {
       console.error('Error fetching trips:', error);
     } finally {
@@ -168,11 +184,6 @@ export default function TripsPage() {
     }
     return filtered;
   }, [allTrips, activeDateFilter, activeTypeFilter, searchQuery]);
-
-  const ratedTrips = filteredTrips.filter(t => t.rating > 0);
-  const averageRating = ratedTrips.length > 0
-    ? (ratedTrips.reduce((sum, trip) => sum + trip.rating, 0) / ratedTrips.length).toFixed(1)
-    : '0.0';
 
   const totalEarnings = filteredTrips
     .filter(t => t.status === 'completed')
@@ -305,7 +316,7 @@ export default function TripsPage() {
                   <div class="detail-value">${trip.pickupType || 'Instant'}</div>
                 </div>
                 <div class="detail-item full-width">
-                  <div class="detail-label">Total Fare</div>
+                  <div class="detail-label">Amount Earned</div>
                   <div class="detail-value" style="color: #059669; font-size: 24px;">₵${trip.fare ? trip.fare.toFixed(2) : '0.00'}</div>
                 </div>
               </div>
@@ -398,6 +409,16 @@ export default function TripsPage() {
                <View style={styles.detailTextContent}>
                  <Text style={styles.detailLabel}>Rating</Text>
                  <Text style={styles.detailValue}>{item.rating ? item.rating.toFixed(1) : 'Unrated'}</Text>
+               </View>
+             </View>
+
+             <View style={styles.detailItem}>
+               <View style={[styles.detailIconWrapper, {backgroundColor: '#DCFCE7', borderColor: '#BBF7D0'}]}>
+                 <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#166534' }}>₵</Text>
+               </View>
+               <View style={styles.detailTextContent}>
+                 <Text style={styles.detailLabel}>Earnings</Text>
+                 <Text style={styles.detailValue}>₵{item.fare ? item.fare.toFixed(2) : '0.00'}</Text>
                </View>
              </View>
           </View>
@@ -505,7 +526,7 @@ export default function TripsPage() {
             <View style={[styles.statIconWrapper, { backgroundColor: 'rgba(255,255,255,0.9)' }]}>
               <Ionicons name="star-outline" size={24} color={colors.amber[600]} />
             </View>
-            <Text style={styles.statValue}>{averageRating}</Text>
+            <Text style={styles.statValue}>{overallRating}</Text>
             <Text style={styles.statLabel}>Rating</Text>
           </View>
         </View>
@@ -670,6 +691,16 @@ export default function TripsPage() {
                    <View style={styles.modalDetailTextContent}>
                      <Text style={styles.modalDetailLabel}>Customer Rating</Text>
                      <Text style={styles.modalDetailValue}>{selectedTrip.rating ? `${selectedTrip.rating.toFixed(1)} / 5.0` : 'No rating given'}</Text>
+                   </View>
+                 </View>
+
+                 <View style={styles.modalDetailRow}>
+                   <View style={styles.modalDetailIconWrapper}>
+                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary }}>₵</Text>
+                   </View>
+                   <View style={styles.modalDetailTextContent}>
+                     <Text style={styles.modalDetailLabel}>Amount Earned</Text>
+                     <Text style={[styles.modalDetailValue, { color: colors.primary, fontWeight: '800' }]}>₵{selectedTrip.fare ? selectedTrip.fare.toFixed(2) : '0.00'}</Text>
                    </View>
                  </View>
 

@@ -266,12 +266,7 @@ export default function ActiveTripPage() {
       if (dbTrip?.id) {
         await supabase.from('orders').update({ sub_status: 'arrived_at_pickup' }).eq('id', dbTrip.id);
       }
-    } else if (currentStatus === 'arrived_at_pickup') {
-      setCurrentStatus('waste_collected');
-      if (dbTrip?.id) {
-        await supabase.from('orders').update({ sub_status: 'waste_collected' }).eq('id', dbTrip.id);
-      }
-    } else if (currentStatus === 'waste_collected') {
+    } else if (currentStatus === 'arrived_at_pickup' || currentStatus === 'waste_collected') {
       if (dbTrip?.id) {
         await supabase.from('orders').update({ 
           status: 'completed', 
@@ -285,9 +280,9 @@ export default function ActiveTripPage() {
 
   const getButtonText = () => {
     if (currentStatus === 'accept_to_tracking') return 'Start Tracking';
-    if (currentStatus === 'driving_to_pickup') return 'Arrived at Pickup';
+    if (currentStatus === 'driving_to_pickup') return 'Arrive at Pickup Location';
     if (currentStatus === 'arrived_at_pickup') return 'Waste Collected';
-    if (currentStatus === 'waste_collected') return 'Complete Trip';
+    if (currentStatus === 'waste_collected') return 'Waste Collected';
     return 'Next';
   };
   

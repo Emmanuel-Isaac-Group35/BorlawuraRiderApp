@@ -183,7 +183,8 @@ export default function RequestPage() {
     pickupLocation: pickupAddress,
     wasteType: fullTripData?.waste_type || fullTripData?.waste_size || 'General Waste',
     distance: tripDistance,
-    coordinates: tripCoords
+    coordinates: tripCoords,
+    fare: fullTripData?.fare || fullTripData?.amount || 0
   };
 
   const formatScheduleDate = (dateString: string) => {
@@ -243,7 +244,7 @@ export default function RequestPage() {
     try {
       if (trip?.id && user?.id) {
         // Update trip status in database to 'active' and assign to rider
-        // Use .is('rider_id', null) to prevent overwriting another rider who accepted it first
+        // Use .or() to prevent overwriting another rider who accepted it first, but allow if it's already assigned to this rider
         const { data, error } = await supabase
           .from('orders')
           .update({ 
@@ -253,7 +254,7 @@ export default function RequestPage() {
              accepted_at: new Date().toISOString()
           })
           .eq('id', trip.id)
-          .is('rider_id', null)
+          .or(`rider_id.is.null,rider_id.eq.${user.id}`)
           .select();
         
         if (error) {
@@ -428,6 +429,17 @@ export default function RequestPage() {
             <View style={styles.locationInfo}>
               <Text style={styles.locationLabel}>Waste Type</Text>
               <Text style={styles.locationValue}>{request.wasteType}</Text>
+            </View>
+          </View>
+
+          {/* Earnings */}
+          <View style={styles.locationRow}>
+            <View style={[styles.locationIcon, { backgroundColor: colors.emerald[100] }]}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.emerald[600] }}>₵</Text>
+            </View>
+            <View style={styles.locationInfo}>
+              <Text style={styles.locationLabel}>Earnings</Text>
+              <Text style={[styles.locationValue, { color: colors.emerald[600], fontSize: 18, fontWeight: '800' }]}>₵{Number(request.fare).toFixed(2)}</Text>
             </View>
           </View>
         </View>
