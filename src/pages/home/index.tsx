@@ -204,7 +204,7 @@ export default function HomePage() {
         let loc = await Location.getLastKnownPositionAsync({});
         if (!loc) {
           loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
+            accuracy: Location.Accuracy.Highest,
           });
         }
         setLocation(loc);
@@ -212,17 +212,24 @@ export default function HomePage() {
         // Subscribe to live location updates so the car marker actually moves
         locationSubscription = await Location.watchPositionAsync(
             {
-                accuracy: Location.Accuracy.High,
-                distanceInterval: 10,   // Update every 10 meters of movement
-                timeInterval: 5000,     // OR every 5 seconds
+                accuracy: Location.Accuracy.Highest,
+                distanceInterval: 2,   // Update every 2 meters of movement
+                timeInterval: 2000,     // OR every 2 seconds
             },
             (newLocation) => {
                 setLocation(newLocation);
+                // Animate map to follow the rider as they move or get a better GPS fix
+                mapRef.current?.animateToRegion({
+                    latitude: newLocation.coords.latitude,
+                    longitude: newLocation.coords.longitude,
+                    latitudeDelta: 0.01, // zoom in closer
+                    longitudeDelta: 0.01,
+                }, 1000);
             }
         );
 
       } catch (err) {
-        console.warn('Location fetching error:', err);
+        console.log('Location fetching error:', err);
         // Fallback to center of Accra if completely failed
         setLocation(prev => prev || {
           coords: {
@@ -488,9 +495,9 @@ export default function HomePage() {
           });
         }}
         provider={PROVIDER_GOOGLE}
-        showsUserLocation={false} 
-        showsMyLocationButton={false}
-        showsCompass={false}
+        showsUserLocation={true} 
+        showsMyLocationButton={true}
+        showsCompass={true}
         toolbarEnabled={false}
       >
           {/* Custom car marker (The Rider) */}

@@ -46,6 +46,7 @@ export default function RequestPage() {
   const [tripDistance, setTripDistance] = useState(0);
   const [tripCoords, setTripCoords] = useState({ lat: 5.6037, lng: -0.1870 });
   const [fullTripData, setFullTripData] = useState(trip);
+  const [riderLocation, setRiderLocation] = useState<Location.LocationObject | null>(null);
 
   const hasDeclinedRef = useRef(false);
 
@@ -144,6 +145,7 @@ export default function RequestPage() {
               }
               
               if (riderLoc) {
+                setRiderLocation(riderLoc);
                 const dist = calculateHaversine(
                   riderLoc.coords.latitude, riderLoc.coords.longitude,
                   lat, lng
@@ -152,7 +154,7 @@ export default function RequestPage() {
               }
             }
           } catch (locationError) {
-            console.error('Location detection failure in Request index.tsx:', locationError);
+            console.log('Location detection failure in Request index.tsx:', locationError);
             setTripDistance(Number(currentTrip.distance_value || currentTrip.distance || 0));
           }
         } else {
@@ -283,13 +285,7 @@ export default function RequestPage() {
           ]
         );
       } else {
-        Alert.alert(
-          'Order Accepted', 
-          'You have successfully accepted this trip.',
-          [
-            { text: 'OK', onPress: () => navigation.replace('ActiveTrip', { trip }) }
-          ]
-        );
+        navigation.replace('ActiveTrip', { trip, initialRiderLocation: riderLocation });
       }
     } catch (error) {
       console.error('Error accepting trip:', error);

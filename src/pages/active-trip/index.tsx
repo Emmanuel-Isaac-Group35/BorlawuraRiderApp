@@ -69,7 +69,7 @@ const darkMapStyle = [
 
 type RootStackParamList = {
   MainTabs: undefined;
-  ActiveTrip: { trip?: any };
+  ActiveTrip: { trip?: any; initialRiderLocation?: Location.LocationObject | null };
   Tracking: { trip?: any };
   TripComplete: { trip?: any };
 };
@@ -89,7 +89,9 @@ export default function ActiveTripPage() {
   
   const mapRef = useRef<MapView>(null);
   const markerRef = useRef<any>(null);
-  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(
+    route.params?.initialRiderLocation || null
+  );
   
   // Use DB sub_status to ensure we recover exactly where we left off
   const [currentStatus, setCurrentStatus] = useState<TripStatus>(() => {
@@ -135,6 +137,19 @@ export default function ActiveTripPage() {
     longitude: destination.lng,
   };
 
+  const displayLocation = currentLocation || {
+    coords: {
+      latitude: destination.lat,
+      longitude: destination.lng,
+      heading: 0,
+      accuracy: 0,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      speed: 0
+    },
+    timestamp: Date.now()
+  };
+
   const {
     coordinates: routeCoordinates,
     summary: routeSummary,
@@ -158,9 +173,9 @@ export default function ActiveTripPage() {
   }, [routeCoordinates]);
 
   const fitBoth = () => {
-    if (!currentLocation || !mapRef.current) return;
+    if (!displayLocation || !mapRef.current) return;
     mapRef.current.fitToCoordinates([
-      { latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude },
+      { latitude: displayLocation.coords.latitude, longitude: displayLocation.coords.longitude },
       { latitude: destination.lat, longitude: destination.lng }
     ], {
       edgePadding: { top: 120, right: 40, bottom: 220, left: 40 },
@@ -243,9 +258,9 @@ export default function ActiveTripPage() {
 
       subscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.Balanced,
-          timeInterval: 10000,
-          distanceInterval: 25,
+          accuracy: Location.Accuracy.Highest,
+          timeInterval: 2000,
+          distanceInterval: 2,
         },
         (newLoc) => setCurrentLocation(newLoc)
       );
@@ -280,7 +295,7 @@ export default function ActiveTripPage() {
 
   const getButtonText = () => {
     if (currentStatus === 'accept_to_tracking') return 'Start Tracking';
-    if (currentStatus === 'driving_to_pickup') return 'Arrive at Pickup Location';
+    if (currentStatus === 'driving_to_pickup') return 'Arrive At Pickup';
     if (currentStatus === 'arrived_at_pickup') return 'Waste Collected';
     if (currentStatus === 'waste_collected') return 'Waste Collected';
     return 'Next';
@@ -319,14 +334,6 @@ export default function ActiveTripPage() {
     );
   };
 
-  if (!currentLocation) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 12, color: colors.text.secondary }}>Acquiring GPS...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -339,33 +346,33 @@ export default function ActiveTripPage() {
         provider={PROVIDER_GOOGLE}
         mapType="standard"
         initialRegion={{
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
+          latitude: displayLocation.coords.latitude,
+          longitude: displayLocation.coords.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
         onLongPress={(e) => {
           setCurrentLocation({
-            ...currentLocation,
+            ...displayLocation,
             coords: {
-              ...currentLocation.coords,
+              ...displayLocation.coords,
               latitude: e.nativeEvent.coordinate.latitude,
               longitude: e.nativeEvent.coordinate.longitude
             }
           });
         }}
-        showsUserLocation={false} 
-        showsMyLocationButton={false}
-        showsCompass={false}
+        showsUserLocation={true} 
+        showsMyLocationButton={true}
+        showsCompass={true}
         toolbarEnabled={false}
       >
-        {/* Rider marker (Top-down car) */}
+        {/* Rider marker (Top-down car) - Keep as fallback but native dot is better */}
         <Marker 
           ref={markerRef}
-          coordinate={{ latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude }} 
+          coordinate={{ latitude: displayLocation.coords.latitude, longitude: displayLocation.coords.longitude }} 
           anchor={{ x: 0.5, y: 0.5 }} 
           zIndex={10}
-          rotation={currentLocation.coords.heading || 0}
+          rotation={displayLocation.coords.heading || 0}
         >
           <View style={styles.carMarkerContainer}>
             <View style={styles.carWindshield} />
@@ -410,8 +417,8 @@ export default function ActiveTripPage() {
           <Polyline
             coordinates={[
               {
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
+                latitude: displayLocation.coords.latitude,
+                longitude: displayLocation.coords.longitude,
               },
               { latitude: destination.lat, longitude: destination.lng },
             ]}
@@ -489,7 +496,7 @@ export default function ActiveTripPage() {
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
                   <SwipeButton 
-                    title={`Swipe to ${getButtonText()}`} 
+                    title={getButtonText()}
                     onSwipeComplete={handleAction} 
                   />
                 </View>

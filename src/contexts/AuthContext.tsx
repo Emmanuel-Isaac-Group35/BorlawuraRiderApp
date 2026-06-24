@@ -188,7 +188,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         supabase.auth.getSession().then(async ({ data: { session }, error }) => {
             if (error) {
                 console.error('Session error (clearing local session):', error.message);
-                await supabase.auth.signOut();
+                await supabase.auth.signOut().catch(e => console.log('Silent sign-out error:', e));
                 setSession(null);
                 setUser(null);
                 setLoading(false);
@@ -422,9 +422,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         console.log("Running in Expo Go: Bypassing background task. Initiating Foreground Polling...");
                         const foregroundSubscription = await Location.watchPositionAsync(
                             {
-                                accuracy: Location.Accuracy.Balanced,
-                                timeInterval: 15000,
-                                distanceInterval: 50,
+                                accuracy: Location.Accuracy.Highest,
+                                timeInterval: 2000,
+                                distanceInterval: 2,
                             },
                             async (location) => {
                                 if (user?.id) {
