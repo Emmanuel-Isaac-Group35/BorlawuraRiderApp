@@ -26,7 +26,12 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
-      "package": "com.kay_mckenzie.borlawuraridernative"
+      "package": "com.kay_mckenzie.borlawuraridernative",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCXzRyuiqH5qSnh1E5ka644etSb6gml6E4"
+        }
+      }
     },
     "plugins": [
       "expo-web-browser",

@@ -488,7 +488,7 @@ export default function ActiveTripPage() {
               </View>
 
               <View style={styles.uberActionRow}>
-                <TouchableOpacity style={styles.uberChatBtn} onPress={() => navigation.navigate('Chat' as never, { trip: dbTrip || trip } as never)}>
+                <TouchableOpacity style={styles.uberChatBtn} onPress={() => navigation.navigate('Chat' as never, { trip: dbTrip } as never)}>
                   <Ionicons name="chatbubble" size={24} color="#000" />
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.uberChatBtn, { marginLeft: 8 }]} onPress={handleCall}>

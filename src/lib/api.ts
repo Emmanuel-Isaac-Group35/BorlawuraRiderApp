@@ -10,7 +10,7 @@ const mapTrip = (trip: any) => ({
                  (trip.customer?.email?.split('@')[0] || 'Customer')),
     pickupLocation: trip.address || trip.pickup_location,
     wasteType: trip.waste_type || 'General Waste',
-    fare: trip.amount || trip.fare || 0,
+    fare: trip.fare || trip.amount || 0,
     date: new Date(trip.created_at).toISOString().split('T')[0],
     time: new Date(trip.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     rating: trip.rating || 0,
